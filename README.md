@@ -40,36 +40,38 @@ open ~/Library/Developer/Xcode/DerivedData/CloseAll-*/Build/Products/Debug/Close
 
 ## Features
 
-| Feature | Status |
-|---------|--------|
-| Active apps list (system filtered) | ✅ |
-| Quit single app | ✅ |
-| Force quit (Option+click) | ✅ |
-| Quit All | ✅ |
-| Force Quit All | ✅ |
-| Ignore list (Finder always ignored) | ✅ |
-| Persist ignore in UserDefaults | ✅ |
-| Auto refresh (notification center) | ✅ |
-| LSUIElement = YES (no Dock icon) | ✅ |
-| NSStatusItem + NSPopover | ✅ |
-| Dynamic NSWorkspace icons | ✅ |
-
-## Info.plist - Important Keys
-
-```xml
-<key>LSUIElement</key>
-<true/>
-```
-This key hides the app from the Dock and "Running Applications" list.
+| Feature | Description |
+|---------|-------------|
+| **Quit All** | Closes all running apps at once |
+| **Minimize All** | Hides all apps with one click, without closing them |
+| **Keyboard Shortcuts** | `⌃⌥⌘Q` to quit all, `⌃⌥⌘M` to minimize all — works even if the menu icon is hidden |
+| **Quit Selected** | Check the apps you want, then quit only those |
+| **Force Quit** | Force close stubborn apps that won't quit normally |
+| **Ignore Apps** | Keep apps you don't want to close out of the list (Finder is always ignored) |
+| **Search** | Quickly find any running app by name |
+| **Hide Menu Icon** | Keep CloseAll running in the background with no visible icon |
+| **Launch at Login** | Open CloseAll automatically when you start your Mac |
+| **Menu Bar Icon** | Lightweight red X icon that sits in your menu bar |
+| **No Dock Icon** | Stays out of your way — runs silently in the menu bar |
+| **Zero Dependencies** | Pure Swift, no external libraries or frameworks |
 
 ## Interactions
 
-- **Click**: opens menu
-- **Hover** on app: shows quit/ignore buttons
-- **Click** xmark button: normal quit
-- **⌥ + Click** xmark button: force quit
-- **Quit All**: closes all listed apps
-- **Force**: force quits all
+- **Left-click icon**: opens the app menu
+- **Right-click icon**: quick actions (Minimize All, Quit All, Settings)
+- **Click the checkbox** next to an app: select it for batch actions
+- **Hover on an app row**: shows close and ignore buttons
+- **× button**: close the app gently
+- **⚡ button**: force close the app (for unresponsive apps)
+- **⌃⌥⌘Q**: quit all apps instantly
+- **⌃⌥⌘M**: minimize all apps instantly
+
+## Settings (gear icon)
+
+- **Keyboard shortcuts**: enable or disable global keyboard shortcuts
+- **Require confirmation**: show a confirmation dialog before quitting all apps
+- **Hide menu icon**: hide the CloseAll icon from the menu bar (shortcuts still work)
+- **Launch at login**: open CloseAll automatically when your Mac starts
 
 ## Notes
 
