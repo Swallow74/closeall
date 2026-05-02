@@ -72,7 +72,3 @@ open ~/Library/Developer/Xcode/DerivedData/CloseAll-*/Build/Products/Debug/Close
 - **Require confirmation**: show a confirmation dialog before quitting all apps
 - **Hide menu icon**: hide the CloseAll icon from the menu bar (shortcuts still work)
 - **Launch at login**: open CloseAll automatically when your Mac starts
-
-## Notes
-
-- Potential fix for AppRowView: if Option+click doesn't work, replace `.keyboardShortcut` with `.onKeyPress` or use `NSEvent` modifier flags check
