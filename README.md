@@ -1,73 +1,76 @@
-# QuitAll - macOS Menu Bar App
+# CloseAll - macOS Menu Bar App
 
-## Struttura progetto
+CloseAll is a lightweight macOS menu bar app that lets you quit all running applications with a single click.
+
+## Project Structure
 
 ```
-quitall/
+closeall/
 ├── Sources/
 │   ├── main.swift              # Entry point (manual NSApplication.run)
 │   ├── AppDelegate.swift       # App delegate, setup StatusBarController
-│   ├── ProcessManager.swift    # Logica: lista app, quit, force quit, ignore
+│   ├── ProcessManager.swift    # Logic: app list, quit, force quit, ignore
 │   ├── Models/
-│   │   └── AppInfo.swift       # Model per app in lista
+│   │   └── AppInfo.swift       # Model for listed apps
 │   └── Views/
 │       ├── StatusBarController.swift   # NSStatusItem + NSPopover
-│       ├── PopoverContentView.swift    # Vista principale menu
-│       └── AppRowView.swift            # Riga singola app
+│       ├── PopoverContentView.swift    # Main menu view
+│       └── AppRowView.swift            # Single app row
 ├── Resources/
-│   └── Info.plist              # LSUIElement=YES (nasconde Dock)
+│   └── Info.plist              # LSUIElement=YES (hides from Dock)
 ├── project.yml                 # XcodeGen config
-└── SPEC.md                     # Specifica tecnica
+└── SPEC.md                     # Technical specification
 ```
 
 ## Build & Run
 
 ```bash
-cd /Users/macbookpro/Programmi/quitall
+cd /path/to/closeall
 xcodegen generate
-open QuitAll.xcodeproj
-# In Xcode: Product > Build (⌘B), poi Run (⌘R)
+open CloseAll.xcodeproj
+# In Xcode: Product > Build (⌘B), then Run (⌘R)
 ```
 
-Oppure da riga comando (se Xcode installato):
+Or via command line:
+
 ```bash
-xcodebuild -project QuitAll.xcodeproj -scheme QuitAll -configuration Debug build
-open ~/Library/Developer/Xcode/DerivedData/QuitAll-*/Build/Products/Debug/QuitAll.app
+xcodebuild -project CloseAll.xcodeproj -scheme CloseAll -configuration Debug build
+open ~/Library/Developer/Xcode/DerivedData/CloseAll-*/Build/Products/Debug/CloseAll.app
 ```
 
-## Funzionalità implementate
+## Features
 
-| Feature | Stato |
-|---------|-------|
-| Lista app attive (filtro sistema) | ✅ |
-| Quit singola app | ✅ |
+| Feature | Status |
+|---------|--------|
+| Active apps list (system filtered) | ✅ |
+| Quit single app | ✅ |
 | Force quit (Option+click) | ✅ |
 | Quit All | ✅ |
 | Force Quit All | ✅ |
-| Ignore list (Finder sempre ignorato) | ✅ |
-| Persistenza ignore in UserDefaults | ✅ |
-| Refresh automatico (notification center) | ✅ |
-| LSUIElement = YES (no Dock) | ✅ |
+| Ignore list (Finder always ignored) | ✅ |
+| Persist ignore in UserDefaults | ✅ |
+| Auto refresh (notification center) | ✅ |
+| LSUIElement = YES (no Dock icon) | ✅ |
 | NSStatusItem + NSPopover | ✅ |
-| Icone dinamiche NSWorkspace | ✅ |
+| Dynamic NSWorkspace icons | ✅ |
 
-## Info.plist - Chiavi importanti
+## Info.plist - Important Keys
 
 ```xml
 <key>LSUIElement</key>
 <true/>
 ```
-Questa chiave nasconde l'app dal Dock e dalla lista "App in uso".
+This key hides the app from the Dock and "Running Applications" list.
 
-## Shortcut
+## Interactions
 
-- **Click**: apre menu
-- **Hover** su app: mostra pulsanti quit/ignore
-- **Click** pulsante xmark: quit normale
-- **⌥ + Click** pulsante xmark: force quit
-- **Quit All**: chiude tutte le app listate
-- **Force**: force quit tutte
+- **Click**: opens menu
+- **Hover** on app: shows quit/ignore buttons
+- **Click** xmark button: normal quit
+- **⌥ + Click** xmark button: force quit
+- **Quit All**: closes all listed apps
+- **Force**: force quits all
 
-## Note
+## Notes
 
-- Eventuale fix AppRowView: se Option+click non funziona, sostituire `.keyboardShortcut` con `.onKeyPress` o usare `NSEvent` modifier flags check
+- Potential fix for AppRowView: if Option+click doesn't work, replace `.keyboardShortcut` with `.onKeyPress` or use `NSEvent` modifier flags check
