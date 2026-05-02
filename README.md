@@ -70,6 +70,4 @@ Questa chiave nasconde l'app dal Dock e dalla lista "App in uso".
 
 ## Note
 
-- Xcode non installato su questo sistema - build richiede Xcode
-- Progetto completo e syntactically correct
 - Eventuale fix AppRowView: se Option+click non funziona, sostituire `.keyboardShortcut` con `.onKeyPress` o usare `NSEvent` modifier flags check
