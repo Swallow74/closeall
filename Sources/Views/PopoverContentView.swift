@@ -3,24 +3,12 @@ import AppKit
 
 struct PopoverContentView: View {
     @ObservedObject var processManager: ProcessManager
+    @StateObject private var settings = AppSettings.shared
+
     @State private var searchText = ""
     @State private var showQuitConfirm = false
     @State private var showForceQuitConfirm = false
     @State private var quitErrors: [QuitError] = []
-
-    private var filteredApps: [AppInfo] {
-        if searchText.isEmpty {
-            return processManager.runningApps
-        } else {
-            return processManager.runningApps.filter {
-                $0.name.localizedCaseInsensitiveContains(searchText)
-            }
-        }
-    }
-
-    private var filteredSelectedCount: Int {
-        filteredApps.filter { processManager.selectedAppIds.contains($0.id) }.count
-    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -28,7 +16,7 @@ struct PopoverContentView: View {
             Divider()
             appListView
             Divider()
-            settingsView
+            settingsSection
             Divider()
             footerView
         }
@@ -52,17 +40,6 @@ struct PopoverContentView: View {
         } message: {
             Text(String(format: AppConstants.AlertMessages.forceQuitSelectedMessage, processManager.selectedAppIds.count))
         }
-        .alert(
-            "Quit Failed",
-            isPresented: Binding(
-                get: { !quitErrors.isEmpty },
-                set: { if !$0 { quitErrors.removeAll() } }
-            )
-        ) {
-            Button("OK") { quitErrors.removeAll() }
-        } message: {
-            Text(quitErrors.map { $0.message }.joined(separator: "\n"))
-        }
     }
 
     private var headerView: some View {
@@ -85,7 +62,7 @@ struct PopoverContentView: View {
 
                 Spacer()
 
-                Text("\(processManager.runningApps.count) \(AppConstants.Localizable.appsLabel) • \(processManager.selectedAppIds.count) \(AppConstants.Localizable.selectedLabel)")
+                Text("\(filteredApps.count) \(AppConstants.Localizable.appsLabel)")
                     .font(.system(size: 11))
                     .foregroundColor(.secondary)
             }
@@ -101,7 +78,7 @@ struct PopoverContentView: View {
         }
     }
 
-    private var appListView: some View {
+private var appListView: some View {
         ScrollView {
             LazyVStack(spacing: 2) {
                 ForEach(filteredApps) { app in
@@ -140,75 +117,169 @@ struct PopoverContentView: View {
         .frame(maxHeight: .infinity)
     }
 
-    private var settingsView: some View {
-        HStack(spacing: 16) {
-            Toggle(AppConstants.Localizable.launchAtLogin, isOn: $launchAtLogin)
-                .font(.system(size: 11))
-                .onChange(of: launchAtLogin) { newValue in
-                    LoginItemsManager.setRegistered(newValue)
-                }
-
-            Spacer()
-
-            Button(action: { NSApplication.shared.terminate(nil) }) {
-                HStack(spacing: 4) {
-                    Image(systemName: "power")
-                    Text(AppConstants.Localizable.quitCloseAll)
-                }
-                .font(.system(size: 11))
-                .foregroundColor(.secondary)
+    private var filteredApps: [AppInfo] {
+        if searchText.isEmpty {
+            return processManager.runningApps
+        } else {
+            return processManager.runningApps.filter {
+                $0.name.localizedCaseInsensitiveContains(searchText)
             }
-            .buttonStyle(.plain)
+        }
+    }
+
+    // MARK: - Settings Section
+
+    private var settingsSection: some View {
+        DisclosureGroup(isExpanded: $settingsExpanded) {
+            VStack(spacing: 6) {
+                Toggle(AppConstants.Localizable.keyboardShortcuts, isOn: $settings.keyboardShortcutsEnabled)
+                    .font(.system(size: 11))
+
+                Toggle(AppConstants.Localizable.requireConfirmation, isOn: $settings.requireQuitConfirmation)
+                    .font(.system(size: 11))
+
+                Toggle(AppConstants.Localizable.hideIcon, isOn: $settings.hideMenuBarIcon)
+                    .font(.system(size: 11))
+
+                Toggle(AppConstants.Localizable.launchAtLogin, isOn: $launchAtLogin)
+                    .font(.system(size: 11))
+                    .onChange(of: launchAtLogin) { newValue in
+                        LoginItemsManager.setRegistered(newValue)
+                    }
+            }
+            .padding(.horizontal, AppConstants.headerPaddingH)
+        } label: {
+            HStack {
+                Image(systemName: "gear")
+                    .foregroundColor(.secondary)
+                    .font(.system(size: 12))
+                Text("Settings")
+                    .font(.system(size: 11, weight: .medium))
+                Spacer()
+                Image(systemName: settingsExpanded ? "chevron.down" : "chevron.right")
+                    .font(.system(size: 10))
+                    .foregroundColor(.secondary)
+            }
+            .contentShape(Rectangle())
+            .onTapGesture {
+                settingsExpanded.toggle()
+            }
         }
         .padding(.horizontal, AppConstants.headerPaddingH)
         .padding(.vertical, 8)
     }
 
+    @State private var settingsExpanded = false
+
     @State private var launchAtLogin: Bool = LoginItemsManager.isRegistered
 
-    private var footerView: some View {
-        HStack(spacing: 12) {
-            Button(action: {
-                showQuitConfirm = true
-            }) {
-                HStack {
-                    Image(systemName: "xmark.circle.fill")
-                    Text("\(AppConstants.Localizable.quitSelected) (\(processManager.selectedAppIds.count))")
-                }
-                .foregroundColor(.white)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 8)
-                .background(Color.blue)
-                .cornerRadius(AppConstants.cornerRadius)
-            }
-            .buttonStyle(.plain)
-            .disabled(processManager.selectedAppIds.isEmpty)
+    // MARK: - Footer
 
-            Button(action: {
-                showForceQuitConfirm = true
-            }) {
-                HStack {
-                    Image(systemName: "xmark.octagon.fill")
-                    Text(AppConstants.Localizable.force)
+    private var footerView: some View {
+        VStack(spacing: 6) {
+            HStack(spacing: 8) {
+                Button(action: { processManager.minimizeAllApps() }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.down.square")
+                            .font(.system(size: 12))
+                        Text(AppConstants.Localizable.minimizeAll)
+                            .font(.system(size: 12))
+                    }
+                    .foregroundColor(.primary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 7)
                 }
-                .foregroundColor(.white)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 8)
-                .background(Color.orange)
-                .cornerRadius(AppConstants.cornerRadius)
+                .buttonStyle(.plain)
+
+                Button(action: { handleQuitAll() }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 12))
+                        Text(AppConstants.Localizable.quitAll)
+                            .font(.system(size: 12))
+                    }
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 7)
+                    .background(Color.red)
+                    .cornerRadius(AppConstants.cornerRadius)
+                }
+                .buttonStyle(.plain)
+            }
+
+            HStack(spacing: 8) {
+                Button(action: { processManager.quitSelectedApps(force: false) }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "xmark.circle")
+                            .font(.system(size: 11))
+                        Text("\(AppConstants.Localizable.quitSelected) (\(processManager.selectedAppIds.count))")
+                            .font(.system(size: 11))
+                    }
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 6)
+                    .background(Color.blue)
+                    .cornerRadius(AppConstants.cornerRadius)
+                }
+                .buttonStyle(.plain)
+                .disabled(processManager.selectedAppIds.isEmpty)
+
+                Button(action: { processManager.quitSelectedApps(force: true) }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "xmark.octagon.fill")
+                            .font(.system(size: 11))
+                        Text(AppConstants.Localizable.force)
+                            .font(.system(size: 11))
+                    }
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 6)
+                    .background(Color.orange)
+                    .cornerRadius(AppConstants.cornerRadius)
+                }
+                .buttonStyle(.plain)
+                .disabled(processManager.selectedAppIds.isEmpty)
+            }
+
+            Button(action: { NSApplication.shared.terminate(nil) }) {
+                HStack(spacing: 4) {
+                    Image(systemName: "power")
+                        .font(.system(size: 10))
+                    Text(AppConstants.Localizable.quitCloseAll)
+                        .font(.system(size: 10))
+                }
+                .foregroundColor(.secondary)
             }
             .buttonStyle(.plain)
-            .disabled(processManager.selectedAppIds.isEmpty)
         }
         .padding(.horizontal, AppConstants.footerPaddingH)
-        .padding(.vertical, AppConstants.footerPaddingV)
+        .padding(.vertical, 8)
+    }
+
+    private func handleQuitAll() {
+        if settings.requireQuitConfirmation {
+            showQuitAllAlert()
+        } else {
+            processManager.quitAllApps()
+        }
+    }
+
+    private func showQuitAllAlert() {
+        let alert = NSAlert()
+        alert.messageText = AppConstants.Localizable.quitAll
+        alert.informativeText = String(format: AppConstants.AlertMessages.quitAllMessage, processManager.runningApps.count)
+        alert.addButton(withTitle: AppConstants.Localizable.quitAll)
+        alert.addButton(withTitle: "Cancel")
+        alert.alertStyle = .warning
+
+        let response = alert.runModal()
+        if response == .alertFirstButtonReturn {
+            processManager.quitAllApps()
+        }
     }
 
     private func performQuitSelected(force: Bool) {
         let errors = processManager.quitSelectedApps(force: force)
-        if !errors.isEmpty {
-            quitErrors = errors
-        }
     }
 }
 

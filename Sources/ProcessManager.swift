@@ -199,6 +199,26 @@ final class ProcessManager: ObservableObject {
         return errors
     }
 
+    func minimizeAllApps() {
+        for app in NSWorkspace.shared.runningApplications {
+            if app.activationPolicy == .regular &&
+               app.bundleIdentifier != (Bundle.main.bundleIdentifier ?? "") &&
+               !ignoredBundleIdentifiers.contains(app.bundleIdentifier ?? "") {
+                app.hide()
+            }
+        }
+    }
+
+    func minimizeSelectedApps() {
+        for appInfo in selectedApps {
+            if let app = NSWorkspace.shared.runningApplications.first(where: {
+                $0.bundleIdentifier == appInfo.bundleIdentifier
+            }) {
+                app.hide()
+            }
+        }
+    }
+
     func addToIgnored(_ bundleIdentifier: String) {
         ignoredBundleIdentifiers.insert(bundleIdentifier)
         saveIgnoredApps()

@@ -3,6 +3,8 @@ import SwiftUI
 
 final class StatusBarController {
     private var statusItem: NSStatusItem
+    private weak var button: NSStatusBarButton?
+    private let contextMenu: NSMenu = NSMenu()
     private var popover: NSPopover
     private let processManager = ProcessManager.shared
 
@@ -11,30 +13,77 @@ final class StatusBarController {
         popover = NSPopover()
 
         setupStatusBarButton()
+        setupContextMenu()
         setupPopover()
+        applyIconVisibility()
+
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleSettingsChanged),
+            name: .settingsChanged,
+            object: nil
+        )
     }
 
     private func setupStatusBarButton() {
-        if let button = statusItem.button {
-            guard var image = NSImage(systemSymbolName: AppConstants.Localizable.statusBarSymbol, accessibilityDescription: "CloseAll") else { return }
-            image.isTemplate = false
-            let config = NSImage.SymbolConfiguration(paletteColors: [NSColor.systemRed, NSColor.white])
-            image = image.withSymbolConfiguration(config) ?? image
-            button.image = image
-            button.action = #selector(togglePopover)
-            button.target = self
-        }
+        guard let btn = statusItem.button else { return }
+        button = btn
+
+        guard var image = NSImage(systemSymbolName: AppConstants.Localizable.statusBarSymbol, accessibilityDescription: "CloseAll") else { return }
+        image.isTemplate = false
+        let config = NSImage.SymbolConfiguration(paletteColors: [NSColor.systemRed, NSColor.white])
+        image = image.withSymbolConfiguration(config) ?? image
+        btn.image = image
+        btn.action = #selector(handleLeftClick)
+        btn.target = self
+    }
+
+    private func setupContextMenu() {
+        let minimizeItem = NSMenuItem(
+            title: AppConstants.Localizable.minimizeAll,
+            action: #selector(minimizeAllAction),
+            keyEquivalent: ""
+        )
+        minimizeItem.image = NSImage(systemSymbolName: "arrow.down.square", accessibilityDescription: nil)
+        minimizeItem.image?.isTemplate = true
+
+        let quitAllItem = NSMenuItem(
+            title: AppConstants.Localizable.quitAll,
+            action: #selector(quitAllAction),
+            keyEquivalent: ""
+        )
+        quitAllItem.image = NSImage(systemSymbolName: "xmark.circle.fill", accessibilityDescription: nil)
+        quitAllItem.image?.isTemplate = true
+
+        let settingsItem = NSMenuItem(
+            title: AppConstants.Localizable.settings,
+            action: #selector(openSettingsAction),
+            keyEquivalent: ""
+        )
+        settingsItem.image = NSImage(systemSymbolName: "gear", accessibilityDescription: nil)
+        settingsItem.image?.isTemplate = true
+
+        contextMenu.addItem(minimizeItem)
+        contextMenu.addItem(quitAllItem)
+        contextMenu.addItem(.separator())
+        contextMenu.addItem(settingsItem)
+
+        minimizeItem.target = self
+        quitAllItem.target = self
+        settingsItem.target = self
+
+        button?.menu = contextMenu
     }
 
     private func setupPopover() {
-        popover.contentSize = NSSize(width: 320, height: 400)
+        popover.contentSize = NSSize(width: AppConstants.popoverWidth, height: AppConstants.popoverHeight)
         popover.behavior = .transient
         popover.contentViewController = NSHostingController(
             rootView: PopoverContentView(processManager: processManager)
         )
     }
 
-    @objc private func togglePopover() {
+    @objc private func handleLeftClick() {
         if popover.isShown {
             closePopover()
         } else {
@@ -43,13 +92,58 @@ final class StatusBarController {
     }
 
     private func showPopover() {
-        if let button = statusItem.button {
-            popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
-            processManager.refreshRunningApps()
-        }
+        guard let btn = button else { return }
+        popover.show(relativeTo: btn.bounds, of: btn, preferredEdge: .minY)
+        processManager.refreshRunningApps()
     }
 
     private func closePopover() {
         popover.performClose(nil)
+    }
+
+    // MARK: - Context menu actions
+
+    @objc private func minimizeAllAction() {
+        processManager.minimizeAllApps()
+    }
+
+    @objc private func quitAllAction() {
+        if AppSettings.shared.requireQuitConfirmation {
+            showQuitAllAlert()
+        } else {
+            processManager.quitAllApps()
+        }
+    }
+
+    private func showQuitAllAlert() {
+        let alert = NSAlert()
+        alert.messageText = AppConstants.Localizable.quitAll
+        alert.informativeText = String(format: AppConstants.AlertMessages.quitAllMessage, processManager.runningApps.count)
+        alert.addButton(withTitle: AppConstants.Localizable.quitAll)
+        alert.addButton(withTitle: "Cancel")
+        alert.alertStyle = .warning
+
+        let response = alert.runModal()
+        if response == .alertFirstButtonReturn {
+            processManager.quitAllApps()
+        }
+    }
+
+    @objc private func openSettingsAction() {
+        showPopover()
+    }
+
+    // MARK: - Icon visibility
+
+    func updateVisibility() {
+        applyIconVisibility()
+    }
+
+    private func applyIconVisibility() {
+        button?.isHidden = AppSettings.shared.hideMenuBarIcon
+    }
+
+    @objc private func handleSettingsChanged() {
+        applyIconVisibility()
     }
 }
