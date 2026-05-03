@@ -4,6 +4,7 @@ import AppKit
 struct PopoverContentView: View {
     @ObservedObject var processManager: ProcessManager
     @StateObject private var settings = AppSettings.shared
+    var onDismiss: () -> Void = {}
 
     @State private var searchText = ""
     @State private var showQuitConfirm = false
@@ -178,7 +179,10 @@ private var appListView: some View {
     private var footerView: some View {
         VStack(spacing: 6) {
             HStack(spacing: 8) {
-                Button(action: { processManager.minimizeAllApps() }) {
+                Button(action: {
+                    onDismiss()
+                    DispatchQueue.main.async { processManager.minimizeAllApps() }
+                }) {
                     HStack(spacing: 4) {
                         Image(systemName: "arrow.down.square")
                             .font(.system(size: 12))
@@ -208,7 +212,10 @@ private var appListView: some View {
             }
 
             HStack(spacing: 8) {
-                Button(action: { processManager.quitSelectedApps(force: false) }) {
+                Button(action: {
+                    onDismiss()
+                    DispatchQueue.main.async { processManager.quitSelectedApps(force: false) }
+                }) {
                     HStack(spacing: 4) {
                         Image(systemName: "xmark.circle")
                             .font(.system(size: 11))
@@ -224,7 +231,10 @@ private var appListView: some View {
                 .buttonStyle(.plain)
                 .disabled(processManager.selectedAppIds.isEmpty)
 
-                Button(action: { processManager.quitSelectedApps(force: true) }) {
+                Button(action: {
+                    onDismiss()
+                    DispatchQueue.main.async { processManager.quitSelectedApps(force: true) }
+                }) {
                     HStack(spacing: 4) {
                         Image(systemName: "xmark.octagon.fill")
                             .font(.system(size: 11))
@@ -257,10 +267,11 @@ private var appListView: some View {
     }
 
     private func handleQuitAll() {
+        onDismiss()
         if settings.requireQuitConfirmation {
             showQuitAllAlert()
         } else {
-            processManager.quitAllApps()
+            DispatchQueue.main.async { processManager.quitAllApps() }
         }
     }
 
@@ -274,7 +285,7 @@ private var appListView: some View {
 
         let response = alert.runModal()
         if response == .alertFirstButtonReturn {
-            processManager.quitAllApps()
+            DispatchQueue.main.async { processManager.quitAllApps() }
         }
     }
 

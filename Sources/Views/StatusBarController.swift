@@ -79,7 +79,7 @@ final class StatusBarController {
         popover.contentSize = NSSize(width: AppConstants.popoverWidth, height: AppConstants.popoverHeight)
         popover.behavior = .transient
         popover.contentViewController = NSHostingController(
-            rootView: PopoverContentView(processManager: processManager)
+            rootView: PopoverContentView(processManager: processManager, onDismiss: { [weak self] in self?.closePopover() })
         )
     }
 
@@ -104,14 +104,16 @@ final class StatusBarController {
     // MARK: - Context menu actions
 
     @objc private func minimizeAllAction() {
-        processManager.minimizeAllApps()
+        closePopover()
+        DispatchQueue.main.async { self.processManager.minimizeAllApps() }
     }
 
     @objc private func quitAllAction() {
+        closePopover()
         if AppSettings.shared.requireQuitConfirmation {
             showQuitAllAlert()
         } else {
-            processManager.quitAllApps()
+            DispatchQueue.main.async { self.processManager.quitAllApps() }
         }
     }
 
@@ -125,7 +127,7 @@ final class StatusBarController {
 
         let response = alert.runModal()
         if response == .alertFirstButtonReturn {
-            processManager.quitAllApps()
+            DispatchQueue.main.async { self.processManager.quitAllApps() }
         }
     }
 
