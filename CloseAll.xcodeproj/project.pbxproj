@@ -91,6 +91,7 @@
 			buildConfigurationList = FF840AE54ABBCF628ECFD935 /* Build configuration list for PBXNativeTarget "CloseAll" */;
 			buildPhases = (
 				41B1407455250492081E7539 /* Sources */,
+				CDCE2C2D2ECF5599344EB808 /* Copy to Applications */,
 			);
 			buildRules = (
 			);
@@ -132,6 +133,27 @@
 			);
 		};
 /* End PBXProject section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		CDCE2C2D2ECF5599344EB808 /* Copy to Applications */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Copy to Applications";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "if [ -d \"$BUILT_PRODUCTS_DIR/$PRODUCT_NAME.app\" ]; then\n  LSREGISTER=\"/System/Library/Frameworks/CoreServices.framework/Versions/Current/Frameworks/LaunchServices.framework/Versions/Current/Support/lsregister\"\n\n  \"$LSREGISTER\" -u /Applications/CloseAll.app 2>/dev/null || true\n  rm -rf /Applications/CloseAll.app\n  cp -R \"$BUILT_PRODUCTS_DIR/$PRODUCT_NAME.app\" /Applications/\n  codesign --force --deep --sign - /Applications/CloseAll.app\n  \"$LSREGISTER\" -f -R -trusted /Applications/CloseAll.app\n\n  echo \"✓ Updated /Applications/CloseAll.app\"\nfi\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		41B1407455250492081E7539 /* Sources */ = {
@@ -194,6 +216,7 @@
 				COPY_PHASE_STRIP = NO;
 				CURRENT_PROJECT_VERSION = 1;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_DEBUG_DYLIB = NO;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				EXCLUDED_ARCHS = "";
@@ -228,6 +251,7 @@
 				INFOPLIST_KEY_CFBundleIconFile = AppIcon.icns;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/../Frameworks";
 				PRODUCT_BUNDLE_IDENTIFIER = com.closeall.app;
+				REGISTER_WITH_LAUNCH_SERVICES = NO;
 				SDKROOT = macosx;
 			};
 			name = Release;
@@ -272,6 +296,7 @@
 				COPY_PHASE_STRIP = NO;
 				CURRENT_PROJECT_VERSION = 1;
 				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_DEBUG_DYLIB = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
 				EXCLUDED_ARCHS = "";
@@ -313,6 +338,7 @@
 				INFOPLIST_KEY_CFBundleIconFile = AppIcon.icns;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/../Frameworks";
 				PRODUCT_BUNDLE_IDENTIFIER = com.closeall.app;
+				REGISTER_WITH_LAUNCH_SERVICES = NO;
 				SDKROOT = macosx;
 			};
 			name = Debug;
