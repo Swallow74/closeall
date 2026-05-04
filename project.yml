@@ -37,3 +37,12 @@ targets:
         LD_RUNPATH_SEARCH_PATHS: "@executable_path/../Frameworks"
         ENABLE_HARDENED_RUNTIME: NO
         CODE_SIGN_ENTITLEMENTS: ""
+    postBuildScripts:
+      - name: "Copy to Applications"
+        script: |
+          if [ -d "$BUILT_PRODUCTS_DIR/$PRODUCT_NAME.app" ]; then
+            rm -rf /Applications/CloseAll.app
+            cp -R "$BUILT_PRODUCTS_DIR/$PRODUCT_NAME.app" /Applications/
+            echo "✓ Updated /Applications/CloseAll.app"
+          fi
+        runOnlyForDebugBuilds: true
