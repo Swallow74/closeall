@@ -29,13 +29,17 @@ final class StatusBarController {
         guard let btn = statusItem.button else { return }
         button = btn
 
-        guard var image = NSImage(systemSymbolName: AppConstants.Localizable.statusBarSymbol, accessibilityDescription: "CloseAll") else { return }
-        image.isTemplate = false
-        let config = NSImage.SymbolConfiguration(paletteColors: [NSColor.systemRed, NSColor.white])
-        image = image.withSymbolConfiguration(config) ?? image
+        let config = NSImage.SymbolConfiguration(pointSize: 16, weight: .regular)
+        let image = NSImage(systemSymbolName: AppConstants.Localizable.statusBarSymbol, accessibilityDescription: "CloseAll")!
+            .withSymbolConfiguration(config)!
+        image.isTemplate = true
         btn.image = image
         btn.action = #selector(handleLeftClick)
         btn.target = self
+
+        let rightClick = NSClickGestureRecognizer(target: self, action: #selector(handleRightClick))
+        rightClick.buttonMask = 1 << 1
+        btn.addGestureRecognizer(rightClick)
     }
 
     private func setupContextMenu() {
@@ -71,8 +75,6 @@ final class StatusBarController {
         minimizeItem.target = self
         quitAllItem.target = self
         settingsItem.target = self
-
-        button?.menu = contextMenu
     }
 
     private func setupPopover() {
@@ -89,6 +91,11 @@ final class StatusBarController {
         } else {
             showPopover()
         }
+    }
+
+    @objc private func handleRightClick() {
+        guard let btn = button else { return }
+        contextMenu.popUp(positioning: nil, at: NSPoint(x: 0, y: btn.bounds.height), in: btn)
     }
 
     private func showPopover() {

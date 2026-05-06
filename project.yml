@@ -9,7 +9,7 @@ options:
 settings:
   base:
     PRODUCT_NAME: CloseAll
-    MARKETING_VERSION: "1.0.0"
+    MARKETING_VERSION: "1.3.0"
     CURRENT_PROJECT_VERSION: "1"
     SWIFT_VERSION: "5.9"
     MACOSX_DEPLOYMENT_TARGET: "12.0"
@@ -34,7 +34,7 @@ targets:
       base:
         INFOPLIST_FILE: Resources/Info.plist
         INFOPLIST_KEY_CFBundleIconFile: AppIcon.icns
-        PRODUCT_BUNDLE_IDENTIFIER: com.closeall.app
+        PRODUCT_BUNDLE_IDENTIFIER: com.closeall.app2
         LD_RUNPATH_SEARCH_PATHS: "@executable_path/../Frameworks"
         ENABLE_HARDENED_RUNTIME: NO
         CODE_SIGN_ENTITLEMENTS: ""
