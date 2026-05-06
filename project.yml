@@ -45,7 +45,6 @@ targets:
           if [ -d "$BUILT_PRODUCTS_DIR/$PRODUCT_NAME.app" ]; then
             LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Versions/Current/Frameworks/LaunchServices.framework/Versions/Current/Support/lsregister"
 
-            "$LSREGISTER" -u /Applications/CloseAll.app 2>/dev/null || true
             rm -rf /Applications/CloseAll.app
             cp -R "$BUILT_PRODUCTS_DIR/$PRODUCT_NAME.app" /Applications/
             codesign --force --deep --sign - /Applications/CloseAll.app

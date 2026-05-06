@@ -6,6 +6,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private let shortcutManager = KeyboardShortcutManager.shared
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        NSApp.setActivationPolicy(.accessory)
+
+        if let bundleURL = Bundle.main.bundleURL as CFURL? {
+            LSRegisterURL(bundleURL, true)
+        }
+
         statusBarController = StatusBarController()
         registerShortcuts()
 

@@ -151,7 +151,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "if [ -d \"$BUILT_PRODUCTS_DIR/$PRODUCT_NAME.app\" ]; then\n  LSREGISTER=\"/System/Library/Frameworks/CoreServices.framework/Versions/Current/Frameworks/LaunchServices.framework/Versions/Current/Support/lsregister\"\n\n  \"$LSREGISTER\" -u /Applications/CloseAll.app 2>/dev/null || true\n  rm -rf /Applications/CloseAll.app\n  cp -R \"$BUILT_PRODUCTS_DIR/$PRODUCT_NAME.app\" /Applications/\n  codesign --force --deep --sign - /Applications/CloseAll.app\n  \"$LSREGISTER\" -f -R -trusted /Applications/CloseAll.app\n\n  echo \"✓ Updated /Applications/CloseAll.app\"\nfi\n";
+			shellScript = "if [ -d \"$BUILT_PRODUCTS_DIR/$PRODUCT_NAME.app\" ]; then\n  LSREGISTER=\"/System/Library/Frameworks/CoreServices.framework/Versions/Current/Frameworks/LaunchServices.framework/Versions/Current/Support/lsregister\"\n\n  rm -rf /Applications/CloseAll.app\n  cp -R \"$BUILT_PRODUCTS_DIR/$PRODUCT_NAME.app\" /Applications/\n  codesign --force --deep --sign - /Applications/CloseAll.app\n  \"$LSREGISTER\" -f -R -trusted /Applications/CloseAll.app\n\n  echo \"✓ Updated /Applications/CloseAll.app\"\nfi\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
