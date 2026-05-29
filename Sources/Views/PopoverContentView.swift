@@ -4,6 +4,7 @@ import AppKit
 struct PopoverContentView: View {
     @ObservedObject var processManager: ProcessManager
     @StateObject private var settings = AppSettings.shared
+    @ObservedObject private var memoryManager = MemoryPressureManager.shared
     var onDismiss: () -> Void = {}
 
     @State private var searchText = ""
@@ -13,6 +14,9 @@ struct PopoverContentView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            if memoryManager.isWarningActive && settings.memoryPressureMonitoringEnabled {
+                memoryWarningBanner
+            }
             headerView
             Divider()
             appListView
@@ -41,6 +45,26 @@ struct PopoverContentView: View {
         } message: {
             Text(String(format: AppConstants.AlertMessages.forceQuitSelectedMessage, processManager.selectedAppIds.count))
         }
+    }
+
+    private var memoryWarningBanner: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundColor(.yellow)
+                .font(.system(size: 14))
+            Text(String(
+                format: AppConstants.Localizable.memoryWarningMessage,
+                memoryManager.freeMemoryPercentage * 100,
+                memoryManager.freeMemoryGB,
+                memoryManager.totalMemoryGB
+            ))
+            .font(.system(size: 11, weight: .medium))
+            .foregroundColor(.white)
+            Spacer()
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(Color.red.opacity(0.85))
     }
 
     private var headerView: some View {
@@ -140,6 +164,9 @@ private var appListView: some View {
                     .font(.system(size: 11))
 
                 Toggle(AppConstants.Localizable.hideIcon, isOn: $settings.hideMenuBarIcon)
+                    .font(.system(size: 11))
+
+                Toggle(AppConstants.Localizable.memoryMonitoring, isOn: $settings.memoryPressureMonitoringEnabled)
                     .font(.system(size: 11))
 
                 Toggle(AppConstants.Localizable.launchAtLogin, isOn: $launchAtLogin)

@@ -14,6 +14,7 @@
 		4A802203C70A2B6D2958BC57 /* AppInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = D555BFE805FBC3A0849FDB96 /* AppInfo.swift */; };
 		61BA8CE5A0CE5D81ABE6403C /* StatusBarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF7B05EC9E3507F0930E3C9B /* StatusBarController.swift */; };
 		9819093D4370ED79A5446572 /* AppConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E95141A7FEA43CB43E00990 /* AppConstants.swift */; };
+		BB1993209C7220E2CF3653CD /* MemoryPressureManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD8B98E7A96AD16EDE454447 /* MemoryPressureManager.swift */; };
 		BCE29B28E8B798BB5A4A30CD /* AppSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37D6E7F0110D205FAE09F67C /* AppSettings.swift */; };
 		C5E43CAB2BA1DC545B8B95E3 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B3D7FF841391C4ACC4775AE /* AppDelegate.swift */; };
 		F5146F606E30C852F961F9FD /* PopoverContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 556BB0AA07ABC9A57891A5E6 /* PopoverContentView.swift */; };
@@ -31,6 +32,7 @@
 		D26181EB1C1BFB6B561E4DF6 /* KeyboardShortcutManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardShortcutManager.swift; sourceTree = "<group>"; };
 		D555BFE805FBC3A0849FDB96 /* AppInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppInfo.swift; sourceTree = "<group>"; };
 		E0915F4A8D096791EEDF472F /* CloseAll.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CloseAll.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		FD8B98E7A96AD16EDE454447 /* MemoryPressureManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryPressureManager.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -76,6 +78,7 @@
 				37D6E7F0110D205FAE09F67C /* AppSettings.swift */,
 				D26181EB1C1BFB6B561E4DF6 /* KeyboardShortcutManager.swift */,
 				7865D2E4AD4095679F768498 /* main.swift */,
+				FD8B98E7A96AD16EDE454447 /* MemoryPressureManager.swift */,
 				8654DC42966399307F48BD10 /* ProcessManager.swift */,
 				404BE211A7071E2940C9CEED /* Models */,
 				E49408C7B1C34D1E8A43D171 /* Views */,
@@ -166,6 +169,7 @@
 				050962D855FE640301A0046D /* AppRowView.swift in Sources */,
 				BCE29B28E8B798BB5A4A30CD /* AppSettings.swift in Sources */,
 				27F201565520D35FBE5B6F4B /* KeyboardShortcutManager.swift in Sources */,
+				BB1993209C7220E2CF3653CD /* MemoryPressureManager.swift in Sources */,
 				F5146F606E30C852F961F9FD /* PopoverContentView.swift in Sources */,
 				2BC3F5258A121E615A1B4316 /* ProcessManager.swift in Sources */,
 				61BA8CE5A0CE5D81ABE6403C /* StatusBarController.swift in Sources */,

@@ -22,6 +22,8 @@ enum AppConstants {
         static let keyboardShortcuts     = "CloseAllKeyboardShortcutsEnabled"
         static let requireConfirmation   = "CloseAllRequireQuitConfirmation"
         static let hideMenuBarIcon       = "CloseAllHideMenuBarIcon"
+        static let memoryPressure       = "CloseAllMemoryPressureMonitoringEnabled"
+        static let memoryPressureThreshold = "CloseAllMemoryPressureThreshold"
     }
 
     enum BundleIdentifiers {
@@ -59,7 +61,15 @@ enum AppConstants {
         static let keyboardShortcuts      = "Keyboard shortcuts"
         static let requireConfirmation    = "Require confirmation for Quit All"
         static let hideIcon               = "Hide menu bar icon"
+        static let memoryWarning          = "Memory Warning"
+        static let memoryWarningMessage   = "Free memory: %.0f%% (%.1f GB / %.1f GB)"
+        static let memoryMonitoring       = "Memory pressure monitoring"
+        static let memoryPressureGood     = "Memory: %.0f%% free"
+        static let memoryPressureBad      = "⚠ Memory: %.0f%% free"
     }
+
+    static let memoryPressureCheckInterval: TimeInterval = 5.0
+    static let defaultMemoryPressureThreshold: Double = 0.20
 
     struct Shortcuts {
         static let quitAll = KeyCombo(key: 0x0A, modifierFlags: [.control, .option, .command])

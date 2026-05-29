@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import Combine
 
 final class StatusBarController {
     private var statusItem: NSStatusItem
@@ -7,6 +8,8 @@ final class StatusBarController {
     private let contextMenu: NSMenu = NSMenu()
     private var popover: NSPopover
     private let processManager = ProcessManager.shared
+    private let memoryManager = MemoryPressureManager.shared
+    private var memoryCancellable: AnyCancellable?
 
     init() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -23,23 +26,48 @@ final class StatusBarController {
             name: .settingsChanged,
             object: nil
         )
+
+        memoryCancellable = memoryManager.$isWarningActive
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.updateButtonImage()
+            }
     }
 
     private func setupStatusBarButton() {
         guard let btn = statusItem.button else { return }
         button = btn
-
-        let config = NSImage.SymbolConfiguration(pointSize: 16, weight: .regular)
-        let image = NSImage(systemSymbolName: AppConstants.Localizable.statusBarSymbol, accessibilityDescription: "CloseAll")!
-            .withSymbolConfiguration(config)!
-        image.isTemplate = true
-        btn.image = image
+        updateButtonImage()
         btn.action = #selector(handleLeftClick)
         btn.target = self
 
         let rightClick = NSClickGestureRecognizer(target: self, action: #selector(handleRightClick))
         rightClick.buttonMask = 1 << 1
         btn.addGestureRecognizer(rightClick)
+    }
+
+    private func updateButtonImage() {
+        guard let btn = button else { return }
+        let config = NSImage.SymbolConfiguration(pointSize: 16, weight: .regular)
+
+        if memoryManager.isWarningActive {
+            let symName = "exclamationmark.triangle.fill"
+            let image = NSImage(systemSymbolName: symName, accessibilityDescription: "Low memory")!
+                .withSymbolConfiguration(config)!
+            image.isTemplate = false
+            btn.image = image
+
+            let pct = memoryManager.freeMemoryPercentage * 100
+            btn.toolTip = String(format: AppConstants.Localizable.memoryPressureBad, pct)
+        } else {
+            let image = NSImage(systemSymbolName: AppConstants.Localizable.statusBarSymbol, accessibilityDescription: "CloseAll")!
+                .withSymbolConfiguration(config)!
+            image.isTemplate = true
+            btn.image = image
+
+            let pct = memoryManager.freeMemoryPercentage * 100
+            btn.toolTip = String(format: AppConstants.Localizable.memoryPressureGood, pct)
+        }
     }
 
     private func setupContextMenu() {
@@ -154,5 +182,6 @@ final class StatusBarController {
 
     @objc private func handleSettingsChanged() {
         applyIconVisibility()
+        updateButtonImage()
     }
 }
