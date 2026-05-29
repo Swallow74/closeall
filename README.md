@@ -9,6 +9,7 @@ closeall/
 ├── Sources/
 │   ├── main.swift              # Entry point (manual NSApplication.run)
 │   ├── AppDelegate.swift       # App delegate, setup StatusBarController
+│   ├── MemoryPressureManager.swift # System memory monitoring (host_statistics64)
 │   ├── ProcessManager.swift    # Logic: app list, quit, force quit, ignore
 │   ├── Models/
 │   │   └── AppInfo.swift       # Model for listed apps
@@ -53,6 +54,7 @@ open ~/Library/Developer/Xcode/DerivedData/CloseAll-*/Build/Products/Debug/Close
 | **Launch at Login** | Open CloseAll automatically when you start your Mac |
 | **Menu Bar Icon** | Lightweight red X icon that sits in your menu bar |
 | **No Dock Icon** | Stays out of your way — runs silently in the menu bar |
+| **Memory Pressure Monitoring** | Monitors system memory via `host_statistics64`; shows a warning banner + changes the menu bar icon + sends a notification when free memory drops below 20% |
 | **Zero Dependencies** | Pure Swift, no external libraries or frameworks |
 
 ## Interactions
@@ -72,3 +74,4 @@ open ~/Library/Developer/Xcode/DerivedData/CloseAll-*/Build/Products/Debug/Close
 - **Require confirmation**: show a confirmation dialog before quitting all apps
 - **Hide menu icon**: hide the CloseAll icon from the menu bar (shortcuts still work)
 - **Launch at login**: open CloseAll automatically when your Mac starts
+- **Memory pressure monitoring**: enable or disable system memory monitoring (on by default); warns when free memory falls below 20%
