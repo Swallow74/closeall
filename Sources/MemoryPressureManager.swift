@@ -8,8 +8,13 @@ final class MemoryPressureManager: ObservableObject {
 
     @Published private(set) var freeMemoryPercentage: Double = 1.0
     @Published private(set) var isWarningActive = false
+    @Published private(set) var isCritical = false
     @Published private(set) var freeMemoryGB: Double = 0.0
     @Published private(set) var totalMemoryGB: Double = 0.0
+
+    var usedMemoryGB: Double {
+        totalMemoryGB - freeMemoryGB
+    }
 
     private var timer: Timer?
     private var hasPostedWarning = false
@@ -60,7 +65,9 @@ final class MemoryPressureManager: ObservableObject {
 
             let threshold = AppSettings.shared.memoryPressureThreshold
             let wasWarning = self.isWarningActive
+            let wasCritical = self.isCritical
             self.isWarningActive = free < threshold
+            self.isCritical = free < 0.1
 
             if self.isWarningActive && !wasWarning && !self.hasPostedWarning {
                 self.hasPostedWarning = true

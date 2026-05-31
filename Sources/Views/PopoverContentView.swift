@@ -87,9 +87,15 @@ struct PopoverContentView: View {
 
                 Spacer()
 
-                Text("\(filteredApps.count) \(AppConstants.Localizable.appsLabel)")
-                    .font(.system(size: 11))
-                    .foregroundColor(.secondary)
+                HStack(spacing: 6) {
+                    Text("\(filteredApps.count) \(AppConstants.Localizable.appsLabel)")
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
+
+                    if settings.memoryPressureMonitoringEnabled {
+                        memoryIndicatorView
+                    }
+                }
             }
             .padding(.horizontal, AppConstants.headerPaddingH)
             .padding(.vertical, 8)
@@ -101,6 +107,30 @@ struct PopoverContentView: View {
                 .background(Color(NSColor.textBackgroundColor))
                 .cornerRadius(6)
         }
+    }
+
+    private var memoryIndicatorView: some View {
+        HStack(spacing: 3) {
+            Circle()
+                .fill(memoryPressureColor)
+                .frame(width: 5, height: 5)
+            Text(String(format: "%.0f%%", memoryManager.freeMemoryPercentage * 100))
+                .font(.system(size: 9, weight: .medium))
+                .foregroundColor(.secondary)
+        }
+        .help(String(
+            format: "Free: %.1f GB / %.1f GB — Used: %.1f GB",
+            memoryManager.freeMemoryGB,
+            memoryManager.totalMemoryGB,
+            memoryManager.usedMemoryGB
+        ))
+    }
+
+    private var memoryPressureColor: Color {
+        let pct = memoryManager.freeMemoryPercentage
+        if pct < 0.1 { return .red }
+        if pct < 0.2 { return .orange }
+        return .green
     }
 
 private var appListView: some View {

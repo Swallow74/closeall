@@ -11,7 +11,7 @@
             ActionType = "Xcode.IDEStandardExecutionActionsCore.ExecutionActionType.ShellScriptAction">
             <ActionContent
                title = "Register with Launch Services"
-               scriptText = "LSREGISTER=&quot;/System/Library/Frameworks/CoreServices.framework/Versions/Current/Frameworks/LaunchServices.framework/Versions/Current/Support/lsregister&quot;&#10;&quot;$LSREGISTER&quot; -f -R -trusted /Applications/CloseAll.app 2&gt;/dev/null || true">
+               scriptText = "APP_NAME=&quot;CloseAll.app&quot;&#10;LSREGISTER=&quot;/System/Library/Frameworks/CoreServices.framework/Versions/Current/Frameworks/LaunchServices.framework/Versions/Current/Support/lsregister&quot;&#10;&#10;&quot;$LSREGISTER&quot; -u /Applications/&quot;$APP_NAME&quot; 2&gt;/dev/null || true&#10;&quot;$LSREGISTER&quot; -u &quot;$HOME&quot;/Applications/&quot;$APP_NAME&quot; 2&gt;/dev/null || true&#10;&quot;$LSREGISTER&quot; -f -R -trusted /Applications/&quot;$APP_NAME&quot; 2&gt;/dev/null || true">
                <EnvironmentBuildable>
                   <BuildableReference
                      BuildableIdentifier = "primary"
