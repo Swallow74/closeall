@@ -1,6 +1,6 @@
 # CloseAll - macOS Menu Bar App
 
-CloseAll is a lightweight macOS menu bar app that lets you quit all running applications with a single click, with real-time system monitoring (memory, CPU, disk, thermal).
+CloseAll is a lightweight macOS menu bar app that lets you quit all running applications with a single click, with real-time system monitoring (memory, CPU, GPU, disk, thermal).
 
 ## Project Structure
 
@@ -15,6 +15,8 @@ closeall/
 │   ├── ThermalStateManager.swift   # Thermal state monitoring (ProcessInfo)
 │   ├── DiskSpaceManager.swift      # Free disk space monitoring
 │   ├── CPUManager.swift            # Global + per-app CPU usage monitoring
+│   ├── GPUManager.swift            # GPU utilization monitoring (IOKit)
+│   ├── GPUIconHelper.swift         # Custom drawn GPU status bar icon
 │   ├── ProcessManager.swift        # Logic: app list, quit, force quit, ignore
 │   ├── KeyboardShortcutManager.swift # Global hotkeys via NSEvent
 │   ├── Models/
@@ -53,6 +55,7 @@ The built app will be automatically copied to `/Applications/CloseAll.app`.
 | **Launch at Login** | Auto-start with your Mac |
 | **Memory Pressure Monitor** | Real-time free RAM %, colored indicator + banner + critical alert |
 | **CPU Monitor** | Global CPU % + per-app CPU usage shown in app list |
+| **GPU Monitor** | GPU utilization % via IOKit AGXAccelerator, custom status bar icon |
 | **Disk Space Monitor** | Free disk space GB/%, warning when below threshold |
 | **Thermal State Monitor** | Tracks system thermal state (fair/serious/critical) |
 | **Auto-Free Memory** | When memory critically low, auto-quits background apps to free RAM |
@@ -77,6 +80,7 @@ The built app will be automatically copied to `/Applications/CloseAll.app`.
 - **Require confirmation**: confirmation dialog before Quit All
 - **Hide menu icon**: hide from menu bar (shortcuts still work)
 - **Memory pressure monitoring**: enable/disable memory monitor (on by default)
+- **GPU monitoring**: enable/disable GPU monitor (off by default)
 - **Thermal state monitoring**: enable/disable thermal monitor (off by default)
 - **Disk space monitoring**: enable/disable disk space monitor (off by default)
 - **CPU monitoring**: enable/disable CPU monitor (off by default)
@@ -91,6 +95,13 @@ The built app will be automatically copied to `/Applications/CloseAll.app`.
 | Normal | > 20% | Green dot in header, standard menu bar icon |
 | Warning | 10–20% | Orange dot, yellow triangle in menu bar |
 | Critical | < 10% | Red dot, red octagon in menu bar |
+
+### GPU Usage
+| Level | Usage | Indicator |
+|-------|-------|-----------|
+| Normal | < 70% | White label, default icon |
+| Warning | 70–90% | Orange label, orange icon in menu bar |
+| Critical | > 90% | Red label, red icon in menu bar |
 
 ### CPU Usage
 | Level | Usage | Indicator |

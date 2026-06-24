@@ -28,7 +28,9 @@ enum AppConstants {
         static let diskSpace            = "CloseAllDiskSpaceMonitoringEnabled"
         static let diskSpaceThreshold   = "CloseAllDiskSpaceThreshold"
         static let cpuMonitoring        = "CloseAllCPUMonitoringEnabled"
+        static let gpuMonitoring        = "CloseAllGPUMonitoringEnabled"
         static let autoFreeMemory       = "CloseAllAutoFreeMemoryEnabled"
+        static let autoQuitProtected    = "CloseAllAutoQuitProtected"
     }
 
     enum BundleIdentifiers {
@@ -90,7 +92,16 @@ enum AppConstants {
         static let thermalGood             = "Thermal: %@"
         static let thermalBad              = "⚠ Thermal: %@"
         static let cpuPressureGood         = "CPU: %.0f%%"
-        static let cpuPressureBad          = "⚠ CPU: %.0f%%"
+        static let cpuPressureBad         = "⚠ CPU: %.0f%%"
+        static let gpuPressureGood         = "GPU: %.0f%%"
+        static let gpuPressureBad         = "⚠ GPU: %.0f%%"
+        static let gpuMonitoring           = "GPU monitoring"
+        static let gpuWarningMessage       = "High GPU usage: %.0f%%"
+        static let protectFromAutoQuit    = "Protect from auto-quit"
+        static let unprotectFromAutoQuit  = "Remove protection"
+        static let settingsGeneral        = "General"
+        static let settingsMonitors       = "Monitors"
+        static let settingsAutoFree       = "Auto-Free"
     }
 
     static let memoryPressureCheckInterval: TimeInterval = 5.0
@@ -98,6 +109,7 @@ enum AppConstants {
     static let diskSpaceCheckInterval: TimeInterval = 60.0
     static let defaultDiskSpaceThreshold: Double = 10.0
     static let cpuCheckInterval: TimeInterval = 3.0
+    static let gpuCheckInterval: TimeInterval = 3.0
 
     struct Shortcuts {
         static let quitAll = KeyCombo(key: 0x0A, modifierFlags: [.control, .option, .command])

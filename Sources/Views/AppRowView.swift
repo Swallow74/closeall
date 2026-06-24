@@ -7,12 +7,13 @@ struct AppRowView: View {
     let isSelected: Bool
     let isQuitting: Bool
     let cpuPercent: Double?
+    let isProtected: Bool
     let onQuit: (Bool) -> Void
     let onToggleIgnore: () -> Void
     let onToggleSelect: () -> Void
+    let onToggleProtect: () -> Void
 
     @State private var isHovering = false
-    @State private var showForceHint = false
 
     var body: some View {
         HStack(spacing: 12) {
@@ -48,8 +49,22 @@ struct AppRowView: View {
                     .cornerRadius(3)
             }
 
+            if isProtected {
+                Image(systemName: "lock.shield.fill")
+                    .font(.system(size: 10))
+                    .foregroundColor(.blue)
+            }
+
             if isHovering {
                 HStack(spacing: 4) {
+                    Button(action: onToggleProtect) {
+                        Image(systemName: isProtected ? "lock.shield.fill" : "lock.shield")
+                            .font(.system(size: 10))
+                            .foregroundColor(.blue)
+                    }
+                    .buttonStyle(.plain)
+                    .help(isProtected ? AppConstants.Localizable.unprotectFromAutoQuit : AppConstants.Localizable.protectFromAutoQuit)
+
                     Button(action: onToggleIgnore) {
                         Image(systemName: isIgnored ? "eye.slash.fill" : "eye.fill")
                             .font(.system(size: 11))

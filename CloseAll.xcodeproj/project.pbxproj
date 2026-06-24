@@ -14,8 +14,10 @@
 		3E03F9D051C106611EC1408B /* CPUManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4569E490B68D4B7FA22433F7 /* CPUManager.swift */; };
 		431E9E9A6555CC052C9A9356 /* ThermalStateManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56E17FA6F7CBDE272AF5B93F /* ThermalStateManager.swift */; };
 		4A802203C70A2B6D2958BC57 /* AppInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = D555BFE805FBC3A0849FDB96 /* AppInfo.swift */; };
+		567B78C70F2DB41E3913EACF /* GPUIconHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59E9D5E5F210049D42FBE789 /* GPUIconHelper.swift */; };
 		61BA8CE5A0CE5D81ABE6403C /* StatusBarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF7B05EC9E3507F0930E3C9B /* StatusBarController.swift */; };
 		668601060E7A55533D9A583E /* DiskSpaceManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F7051F38BAA1FE8E262FB94 /* DiskSpaceManager.swift */; };
+		6D596F7CF40C2B11DDD12255 /* GPUManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F802B1485C91D28350B4D889 /* GPUManager.swift */; };
 		9819093D4370ED79A5446572 /* AppConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E95141A7FEA43CB43E00990 /* AppConstants.swift */; };
 		BB1993209C7220E2CF3653CD /* MemoryPressureManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD8B98E7A96AD16EDE454447 /* MemoryPressureManager.swift */; };
 		BCE29B28E8B798BB5A4A30CD /* AppSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37D6E7F0110D205FAE09F67C /* AppSettings.swift */; };
@@ -31,6 +33,7 @@
 		4569E490B68D4B7FA22433F7 /* CPUManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CPUManager.swift; sourceTree = "<group>"; };
 		556BB0AA07ABC9A57891A5E6 /* PopoverContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PopoverContentView.swift; sourceTree = "<group>"; };
 		56E17FA6F7CBDE272AF5B93F /* ThermalStateManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThermalStateManager.swift; sourceTree = "<group>"; };
+		59E9D5E5F210049D42FBE789 /* GPUIconHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GPUIconHelper.swift; sourceTree = "<group>"; };
 		7865D2E4AD4095679F768498 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		8654DC42966399307F48BD10 /* ProcessManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessManager.swift; sourceTree = "<group>"; };
 		8B3D7FF841391C4ACC4775AE /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
@@ -38,6 +41,7 @@
 		D26181EB1C1BFB6B561E4DF6 /* KeyboardShortcutManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardShortcutManager.swift; sourceTree = "<group>"; };
 		D555BFE805FBC3A0849FDB96 /* AppInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppInfo.swift; sourceTree = "<group>"; };
 		E0915F4A8D096791EEDF472F /* CloseAll.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CloseAll.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		F802B1485C91D28350B4D889 /* GPUManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GPUManager.swift; sourceTree = "<group>"; };
 		FD8B98E7A96AD16EDE454447 /* MemoryPressureManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryPressureManager.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -84,6 +88,8 @@
 				37D6E7F0110D205FAE09F67C /* AppSettings.swift */,
 				4569E490B68D4B7FA22433F7 /* CPUManager.swift */,
 				2F7051F38BAA1FE8E262FB94 /* DiskSpaceManager.swift */,
+				59E9D5E5F210049D42FBE789 /* GPUIconHelper.swift */,
+				F802B1485C91D28350B4D889 /* GPUManager.swift */,
 				D26181EB1C1BFB6B561E4DF6 /* KeyboardShortcutManager.swift */,
 				7865D2E4AD4095679F768498 /* main.swift */,
 				FD8B98E7A96AD16EDE454447 /* MemoryPressureManager.swift */,
@@ -179,6 +185,8 @@
 				BCE29B28E8B798BB5A4A30CD /* AppSettings.swift in Sources */,
 				3E03F9D051C106611EC1408B /* CPUManager.swift in Sources */,
 				668601060E7A55533D9A583E /* DiskSpaceManager.swift in Sources */,
+				567B78C70F2DB41E3913EACF /* GPUIconHelper.swift in Sources */,
+				6D596F7CF40C2B11DDD12255 /* GPUManager.swift in Sources */,
 				27F201565520D35FBE5B6F4B /* KeyboardShortcutManager.swift in Sources */,
 				BB1993209C7220E2CF3653CD /* MemoryPressureManager.swift in Sources */,
 				F5146F606E30C852F961F9FD /* PopoverContentView.swift in Sources */,

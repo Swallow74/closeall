@@ -8,6 +8,7 @@ final class ProcessManager: ObservableObject {
     @Published private(set) var runningApps: [AppInfo] = []
     @Published private(set) var quittingAppIds: Set<String> = []
     @Published var ignoredBundleIdentifiers: Set<String> = []
+    @Published var autoQuitProtectedBundleIdentifiers: Set<String> = []
     @Published var selectedAppIds: Set<String> = []
 
     private var workspaceObservers: [NSObjectProtocol] = []
@@ -15,6 +16,7 @@ final class ProcessManager: ObservableObject {
 
     private init() {
         loadIgnoredApps()
+        loadAutoQuitProtected()
         refreshRunningApps()
         setupWorkspaceObservers()
     }
@@ -252,6 +254,29 @@ final class ProcessManager: ObservableObject {
 
     private func saveIgnoredApps() {
         UserDefaults.standard.set(Array(ignoredBundleIdentifiers), forKey: AppConstants.UserDefaultsKeys.ignoredApps)
+    }
+
+    func toggleAutoQuitProtection(_ bundleIdentifier: String) {
+        if autoQuitProtectedBundleIdentifiers.contains(bundleIdentifier) {
+            autoQuitProtectedBundleIdentifiers.remove(bundleIdentifier)
+        } else {
+            autoQuitProtectedBundleIdentifiers.insert(bundleIdentifier)
+        }
+        saveAutoQuitProtected()
+    }
+
+    func isAutoQuitProtected(_ bundleIdentifier: String) -> Bool {
+        autoQuitProtectedBundleIdentifiers.contains(bundleIdentifier)
+    }
+
+    private func loadAutoQuitProtected() {
+        if let saved = UserDefaults.standard.stringArray(forKey: AppConstants.UserDefaultsKeys.autoQuitProtected) {
+            autoQuitProtectedBundleIdentifiers = Set(saved)
+        }
+    }
+
+    private func saveAutoQuitProtected() {
+        UserDefaults.standard.set(Array(autoQuitProtectedBundleIdentifiers), forKey: AppConstants.UserDefaultsKeys.autoQuitProtected)
     }
 
     func ignoredAppNames() -> [(bundleID: String, name: String)] {

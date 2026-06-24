@@ -140,6 +140,9 @@ CloseAll/
 │   ├── ProcessManager.swift          # Running apps, quit/minimize logic, ignored apps
 │   ├── KeyboardShortcutManager.swift # Global hotkeys via NSEvent.addGlobalMonitorForEvents
 │   ├── AppConstants.swift            # String keys, dimensions, UserDefaults keys, key combos
+│   ├── CPUManager.swift            # Global + per-app CPU usage monitoring
+│   ├── GPUManager.swift            # GPU utilization monitoring (IOKit)
+│   ├── GPUIconHelper.swift         # Custom drawn GPU status bar icon
 │   ├── Models/
 │   │   └── AppInfo.swift             # Running app model (Identifiable, Hashable)
 │   └── Views/
@@ -181,6 +184,9 @@ CloseAll/
 - `CloseAllKeyboardShortcutsEnabled` — Bool, default true
 - `CloseAllRequireQuitConfirmation` — Bool, default false (1-click quit)
 - `CloseAllHideMenuBarIcon` — Bool, default false
+- `CloseAllCPUMonitoringEnabled` — Bool, default false
+- `CloseAllGPUMonitoringEnabled` — Bool, default false
+- `CloseAllAutoQuitProtected` — [String] bundle identifiers auto-quit protected
 
 ### Notification System
 - `Notification.Name.settingsChanged` — emesso da AppSettings quando un setting cambia

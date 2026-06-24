@@ -151,13 +151,15 @@ final class MemoryPressureManager: ObservableObject {
         var freedCount = 0
         var freedBytes: UInt64 = 0
 
+        let pm = ProcessManager.shared
         for app in NSWorkspace.shared.runningApplications {
             guard app.activationPolicy == .regular,
                   let bundleID = app.bundleIdentifier,
                   bundleID != ownBundleID,
                   bundleID != AppConstants.BundleIdentifiers.finder,
                   bundleID != frontApp?.bundleIdentifier,
-                  !ProcessManager.shared.ignoredBundleIdentifiers.contains(bundleID)
+                  !pm.ignoredBundleIdentifiers.contains(bundleID),
+                  !pm.autoQuitProtectedBundleIdentifiers.contains(bundleID)
             else { continue }
 
             var task: mach_port_name_t = 0

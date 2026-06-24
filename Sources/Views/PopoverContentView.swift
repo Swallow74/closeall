@@ -3,22 +3,46 @@ import AppKit
 
 struct PopoverContentView: View {
     @ObservedObject var processManager: ProcessManager
-    @StateObject private var settings = AppSettings.shared
     @ObservedObject private var memoryManager = MemoryPressureManager.shared
     @ObservedObject private var thermalManager = ThermalStateManager.shared
     @ObservedObject private var diskManager = DiskSpaceManager.shared
     @ObservedObject private var cpuManager = CPUManager.shared
+    @ObservedObject private var gpuManager = GPUManager.shared
     var onDismiss: () -> Void = {}
 
     @State private var searchText = ""
     @State private var showQuitConfirm = false
     @State private var showForceQuitConfirm = false
-    @State private var quitErrors: [QuitError] = []
-    @State private var settingsExpanded = false
-    @State private var launchAtLogin: Bool = LoginItemsManager.isRegistered
+    @State private var showSettings = false
     @State private var showIgnoredSheet = false
+    @State private var expandedGroups: Set<String> = ["General", "Monitors", "Auto-Free"]
+
+    @AppStorage(AppConstants.UserDefaultsKeys.keyboardShortcuts) private var keyboardShortcutsEnabled = true
+    @AppStorage(AppConstants.UserDefaultsKeys.requireConfirmation) private var requireQuitConfirmation = false
+    @AppStorage(AppConstants.UserDefaultsKeys.hideMenuBarIcon) private var hideMenuBarIcon = false
+    @AppStorage(AppConstants.UserDefaultsKeys.launchAtLogin) private var launchAtLogin = false
+    @AppStorage(AppConstants.UserDefaultsKeys.memoryPressure) private var memoryPressureMonitoringEnabled = true
+    @AppStorage(AppConstants.UserDefaultsKeys.thermalState) private var thermalStateMonitoringEnabled = false
+    @AppStorage(AppConstants.UserDefaultsKeys.diskSpace) private var diskSpaceMonitoringEnabled = false
+    @AppStorage(AppConstants.UserDefaultsKeys.cpuMonitoring) private var cpuMonitoringEnabled = false
+    @AppStorage(AppConstants.UserDefaultsKeys.gpuMonitoring) private var gpuMonitoringEnabled = false
+    @AppStorage(AppConstants.UserDefaultsKeys.autoFreeMemory) private var autoFreeMemoryEnabled = false
 
     var body: some View {
+        VStack(spacing: 0) {
+            if showSettings {
+                settingsView
+            } else {
+                mainView
+            }
+        }
+        .frame(width: AppConstants.popoverWidth, height: AppConstants.popoverHeight)
+        .background(Color(NSColor.windowBackgroundColor))
+    }
+
+    // MARK: - Main View
+
+    private var mainView: some View {
         VStack(spacing: 0) {
             if anyWarningActive {
                 warningBanners
@@ -27,12 +51,8 @@ struct PopoverContentView: View {
             Divider()
             appListView
             Divider()
-            settingsSection
-            Divider()
             footerView
         }
-        .frame(width: AppConstants.popoverWidth, height: AppConstants.popoverHeight)
-        .background(Color(NSColor.windowBackgroundColor))
         .alert(
             AppConstants.AlertMessages.quitSelectedTitle,
             isPresented: $showQuitConfirm
@@ -55,6 +75,118 @@ struct PopoverContentView: View {
             ignoredAppsSheet
         }
     }
+
+    // MARK: - Settings View
+
+    private var settingsView: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text(AppConstants.Localizable.settings)
+                    .font(.system(size: 13, weight: .semibold))
+                Spacer()
+                Button("Done") { showSettings = false }
+                    .font(.system(size: 11))
+                    .keyboardShortcut(.defaultAction)
+            }
+            .padding(.horizontal, AppConstants.headerPaddingH)
+            .padding(.vertical, 10)
+
+            Divider()
+
+            ScrollView {
+                VStack(spacing: 0) {
+                    settingsGroup(
+                        id: "General",
+                        icon: "gearshape",
+                        label: AppConstants.Localizable.settingsGeneral
+                    ) {
+                        checkbox(AppConstants.Localizable.keyboardShortcuts, isOn: $keyboardShortcutsEnabled)
+                        checkbox(AppConstants.Localizable.requireConfirmation, isOn: $requireQuitConfirmation)
+                        checkbox(AppConstants.Localizable.hideIcon, isOn: $hideMenuBarIcon)
+                        checkbox(AppConstants.Localizable.launchAtLogin, isOn: $launchAtLogin)
+                    }
+                    .onChange(of: launchAtLogin) { newValue in
+                        LoginItemsManager.setRegistered(newValue)
+                    }
+
+                    Divider().padding(.horizontal, AppConstants.headerPaddingH)
+
+                    settingsGroup(
+                        id: "Monitors",
+                        icon: "chart.bar",
+                        label: AppConstants.Localizable.settingsMonitors
+                    ) {
+                        checkbox(AppConstants.Localizable.memoryMonitoring, isOn: $memoryPressureMonitoringEnabled)
+                        checkbox(AppConstants.Localizable.thermalMonitoring, isOn: $thermalStateMonitoringEnabled)
+                        checkbox(AppConstants.Localizable.diskMonitoring, isOn: $diskSpaceMonitoringEnabled)
+                        checkbox(AppConstants.Localizable.cpuMonitoring, isOn: $cpuMonitoringEnabled)
+                        checkbox(AppConstants.Localizable.gpuMonitoring, isOn: $gpuMonitoringEnabled)
+                    }
+
+                    Divider().padding(.horizontal, AppConstants.headerPaddingH)
+
+                    settingsGroup(
+                        id: "Auto-Free",
+                        icon: "sparkles",
+                        label: AppConstants.Localizable.settingsAutoFree
+                    ) {
+                        checkbox(AppConstants.Localizable.autoFreeMemory, isOn: $autoFreeMemoryEnabled)
+                            .disabled(!memoryPressureMonitoringEnabled)
+
+                        Button(action: { showIgnoredSheet = true }) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "eye.slash.fill")
+                                    .font(.system(size: 10))
+                                Text(AppConstants.Localizable.manageIgnored)
+                                    .font(.system(size: 10))
+                            }
+                            .foregroundColor(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.vertical, 4)
+            }
+        }
+    }
+
+    private func settingsGroup<Content: View>(id: String, icon: String, label: String, @ViewBuilder content: () -> Content) -> some View {
+        let isExpanded = expandedGroups.contains(id)
+        return VStack(spacing: 0) {
+            Button(action: {
+                if isExpanded { expandedGroups.remove(id) }
+                else { expandedGroups.insert(id) }
+            }) {
+                HStack(spacing: 6) {
+                    Image(systemName: icon)
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
+                    Text(label)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(.primary)
+                    Spacer()
+                    Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                        .font(.system(size: 9))
+                        .foregroundColor(.secondary)
+                }
+                .contentShape(Rectangle())
+                .padding(.horizontal, AppConstants.headerPaddingH)
+                .padding(.vertical, 8)
+            }
+            .buttonStyle(.plain)
+
+            if isExpanded {
+                VStack(alignment: .leading, spacing: 6) {
+                    content()
+                }
+                .font(.system(size: 11))
+                .padding(.horizontal, AppConstants.headerPaddingH)
+                .padding(.bottom, 6)
+            }
+        }
+    }
+
+    // MARK: - Ignored Apps Sheet
 
     private var ignoredAppsSheet: some View {
         let ignored = processManager.ignoredAppNames()
@@ -127,17 +259,20 @@ struct PopoverContentView: View {
         .background(Color(NSColor.windowBackgroundColor))
     }
 
+    // MARK: - Warning Banners
+
     private var anyWarningActive: Bool {
-        (memoryManager.isWarningActive && settings.memoryPressureMonitoringEnabled) ||
-        (thermalManager.isWarningActive && settings.thermalStateMonitoringEnabled) ||
-        (diskManager.isWarningActive && settings.diskSpaceMonitoringEnabled) ||
-        (cpuManager.isWarningActive && settings.cpuMonitoringEnabled)
+        (memoryManager.isWarningActive && memoryPressureMonitoringEnabled) ||
+        (thermalManager.isWarningActive && thermalStateMonitoringEnabled) ||
+        (diskManager.isWarningActive && diskSpaceMonitoringEnabled) ||
+        (cpuManager.isWarningActive && cpuMonitoringEnabled) ||
+        (gpuManager.isWarningActive && gpuMonitoringEnabled)
     }
 
     @ViewBuilder
     private var warningBanners: some View {
         VStack(spacing: 1) {
-            if memoryManager.isWarningActive && settings.memoryPressureMonitoringEnabled {
+            if memoryManager.isWarningActive && memoryPressureMonitoringEnabled {
                 warningBanner(
                     icon: "exclamationmark.triangle.fill",
                     color: memoryManager.isCritical ? .red : .orange,
@@ -149,7 +284,7 @@ struct PopoverContentView: View {
                     )
                 )
             }
-            if thermalManager.isWarningActive && settings.thermalStateMonitoringEnabled {
+            if thermalManager.isWarningActive && thermalStateMonitoringEnabled {
                 warningBanner(
                     icon: "thermometer.sun.fill",
                     color: thermalManager.isCritical ? .red : .orange,
@@ -159,25 +294,35 @@ struct PopoverContentView: View {
                     )
                 )
             }
-            if diskManager.isWarningActive && settings.diskSpaceMonitoringEnabled {
+            if diskManager.isWarningActive && diskSpaceMonitoringEnabled {
                 warningBanner(
                     icon: "externaldrive.badge.exclamationmark",
                     color: diskManager.isCritical ? .red : .orange,
                     text: String(
                         format: AppConstants.Localizable.diskWarningMessage,
-                        diskManager.freePercentage * 100,
                         diskManager.freeGB,
+                        (1 - diskManager.freePercentage) * 100,
                         diskManager.totalGB
                     )
                 )
             }
-            if cpuManager.isWarningActive && settings.cpuMonitoringEnabled {
+            if cpuManager.isWarningActive && cpuMonitoringEnabled {
                 warningBanner(
                     icon: "cpu.fill",
                     color: cpuManager.isCritical ? .red : .orange,
                     text: String(
                         format: AppConstants.Localizable.cpuWarningMessage,
                         cpuManager.globalCPUPercent
+                    )
+                )
+            }
+            if gpuManager.isWarningActive && gpuMonitoringEnabled {
+                warningBanner(
+                    icon: "square.grid.3x3.fill",
+                    color: gpuManager.isCritical ? .red : .orange,
+                    text: String(
+                        format: AppConstants.Localizable.gpuWarningMessage,
+                        gpuManager.gpuUtilizationPercent
                     )
                 )
             }
@@ -201,9 +346,96 @@ struct PopoverContentView: View {
         .background(color.opacity(0.85))
     }
 
+    // MARK: - Header
+
     private var headerView: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 6) {
+            HStack(spacing: 10) {
+                if cpuMonitoringEnabled {
+                    compactIndicator(
+                        icon: "cpu",
+                        color: cpuManager.isCritical ? .red :
+                            cpuManager.isWarningActive ? .orange : .primary,
+                        text: String(format: "%.0f%%", cpuManager.globalCPUPercent),
+                        help: String(
+                            format: "CPU: %.0f%%\nGlobal CPU usage",
+                            cpuManager.globalCPUPercent
+                        )
+                    )
+                }
+                if gpuMonitoringEnabled {
+                    compactIndicator(
+                        icon: "square.grid.3x3.fill",
+                        color: gpuManager.isCritical ? .red :
+                            gpuManager.isWarningActive ? .orange : .primary,
+                        text: String(format: "%.0f%%", gpuManager.gpuUtilizationPercent),
+                        help: String(
+                            format: "GPU: %.0f%%\nGPU utilization",
+                            gpuManager.gpuUtilizationPercent
+                        )
+                    )
+                }
+                if memoryPressureMonitoringEnabled {
+                    compactIndicator(
+                        icon: "memorychip",
+                        color: memoryPressureColor,
+                        text: String(format: "%.0f%%", memoryManager.freeMemoryPercentage * 100),
+                        help: String(
+                            format: "Memory: %.0f%%\nFree: %.1f GB / %.1f GB — Used: %.1f GB",
+                            memoryManager.freeMemoryPercentage * 100,
+                            memoryManager.freeMemoryGB,
+                            memoryManager.totalMemoryGB,
+                            memoryManager.usedMemoryGB
+                        )
+                    )
+                }
+                if diskSpaceMonitoringEnabled && diskManager.totalGB > 0 {
+                    compactIndicator(
+                        icon: "externaldrive",
+                        color: diskManager.isCritical ? .red :
+                            diskManager.isWarningActive ? .orange : .primary,
+                        text: String(format: "%.0f%%", (1 - diskManager.freePercentage) * 100),
+                        help: String(
+                            format: "Disk: %.0f%%\nFree: %.1f GB / %.1f GB",
+                            (1 - diskManager.freePercentage) * 100,
+                            diskManager.freeGB,
+                            diskManager.totalGB
+                        )
+                    )
+                }
+                if thermalStateMonitoringEnabled {
+                    let thermalColor: Color = thermalManager.isCritical ? .red :
+                        thermalManager.isWarningActive ? .orange : .primary
+                    compactIndicator(
+                        icon: "thermometer",
+                        color: thermalColor,
+                        text: thermalStateShortLabel(thermalManager.thermalState),
+                        help: String(
+                            format: "Thermal: %@\n%@",
+                            thermalManager.localizedState,
+                            thermalManager.isCritical ? "Critical — performance throttled" :
+                                thermalManager.isWarningActive ? "Warning — reduce workload" :
+                                "Normal"
+                        )
+                    )
+                }
+
+            }
+            .padding(.horizontal, AppConstants.headerPaddingH)
+            .padding(.top, 8)
+
+            TextField(AppConstants.Localizable.searchPlaceholder, text: $searchText)
+                .font(.system(size: 12))
+                .padding(.horizontal, AppConstants.headerPaddingH)
+                .padding(.vertical, 6)
+                .background(Color(NSColor.textBackgroundColor))
+                .cornerRadius(6)
+
             HStack {
+                Text("\(filteredApps.count) \(AppConstants.Localizable.appsLabel)")
+                    .font(.system(size: 10))
+                    .foregroundColor(.secondary)
+                Spacer()
                 Button(action: {
                     if processManager.allSelected {
                         processManager.deselectAll()
@@ -215,82 +447,27 @@ struct PopoverContentView: View {
                         Image(systemName: processManager.allSelected ? "checkmark.square.fill" : "square")
                         Text(processManager.allSelected ? AppConstants.Localizable.deselectAll : AppConstants.Localizable.selectAll)
                     }
-                    .font(.system(size: 11))
+                    .font(.system(size: 10))
+                    .foregroundColor(.secondary)
                 }
                 .buttonStyle(.plain)
-
-                Spacer()
-
-                HStack(spacing: 6) {
-                    Text("\(filteredApps.count) \(AppConstants.Localizable.appsLabel)")
-                        .font(.system(size: 11))
-                        .foregroundColor(.secondary)
-
-                    if settings.memoryPressureMonitoringEnabled {
-                        compactIndicator(
-                            color: memoryPressureColor,
-                            text: String(format: "%.0f%%", memoryManager.freeMemoryPercentage * 100),
-                            help: String(
-                                format: "Free: %.1f GB / %.1f GB — Used: %.1f GB",
-                                memoryManager.freeMemoryGB,
-                                memoryManager.totalMemoryGB,
-                                memoryManager.usedMemoryGB
-                            )
-                        )
-                    }
-                    if settings.thermalStateMonitoringEnabled {
-                        let thermalColor: Color = thermalManager.isCritical ? .red :
-                            thermalManager.isWarningActive ? .orange : .green
-                        compactIndicator(
-                            color: thermalColor,
-                            text: thermalStateShortLabel(thermalManager.thermalState),
-                            help: String(format: AppConstants.Localizable.thermalGood, thermalManager.localizedState)
-                        )
-                    }
-                    if settings.diskSpaceMonitoringEnabled && diskManager.totalGB > 0 {
-                        compactIndicator(
-                            color: diskManager.isCritical ? .red :
-                                diskManager.isWarningActive ? .orange : .green,
-                            text: String(format: "%.0f%%", diskManager.freePercentage * 100),
-                            help: String(
-                                format: "Free: %.1f GB / %.1f GB",
-                                diskManager.freeGB,
-                                diskManager.totalGB
-                            )
-                        )
-                    }
-                    if settings.cpuMonitoringEnabled {
-                        compactIndicator(
-                            color: cpuManager.isCritical ? .red :
-                                cpuManager.isWarningActive ? .orange : .green,
-                            text: String(format: "%.0f%%", cpuManager.globalCPUPercent),
-                            help: "Global CPU usage"
-                        )
-                    }
-                }
             }
             .padding(.horizontal, AppConstants.headerPaddingH)
-            .padding(.vertical, 8)
-
-            TextField(AppConstants.Localizable.searchPlaceholder, text: $searchText)
-                .font(.system(size: 12))
-                .padding(.horizontal, AppConstants.headerPaddingH)
-                .padding(.vertical, 6)
-                .background(Color(NSColor.textBackgroundColor))
-                .cornerRadius(6)
         }
+        .padding(.bottom, 4)
     }
 
-    private func compactIndicator(color: Color, text: String, help: String) -> some View {
-        HStack(spacing: 3) {
-            Circle()
-                .fill(color)
-                .frame(width: 5, height: 5)
+    private func compactIndicator(icon: String, color: Color, text: String, help: String) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: icon)
+                .font(.system(size: 11))
+                .foregroundColor(color)
             Text(text)
-                .font(.system(size: 9, weight: .medium))
+                .font(.system(size: 11, weight: .medium))
                 .foregroundColor(.secondary)
         }
-        .help(help)
+        .contentShape(Rectangle())
+        .toolTip(help)
     }
 
     private func thermalStateShortLabel(_ state: ProcessInfo.ThermalState) -> String {
@@ -307,8 +484,10 @@ struct PopoverContentView: View {
         let pct = memoryManager.freeMemoryPercentage
         if pct < 0.1 { return .red }
         if pct < 0.2 { return .orange }
-        return .green
+        return .primary
     }
+
+    // MARK: - App List
 
     private var appListView: some View {
         ScrollView {
@@ -319,7 +498,8 @@ struct PopoverContentView: View {
                         isIgnored: processManager.ignoredBundleIdentifiers.contains(app.bundleIdentifier),
                         isSelected: processManager.selectedAppIds.contains(app.id),
                         isQuitting: processManager.isQuitting(app.id),
-                        cpuPercent: settings.cpuMonitoringEnabled ? cpuManager.cpuForBundleID(app.bundleIdentifier) : nil,
+                        cpuPercent: cpuMonitoringEnabled ? cpuManager.cpuForBundleID(app.bundleIdentifier) : nil,
+                        isProtected: processManager.isAutoQuitProtected(app.bundleIdentifier),
                         onQuit: { force in
                             processManager.quitApp(app, force: force)
                         },
@@ -328,6 +508,9 @@ struct PopoverContentView: View {
                         },
                         onToggleSelect: {
                             processManager.toggleSelection(app.id)
+                        },
+                        onToggleProtect: {
+                            processManager.toggleAutoQuitProtection(app.bundleIdentifier)
                         }
                     )
                 }
@@ -360,175 +543,132 @@ struct PopoverContentView: View {
         }
     }
 
-    // MARK: - Settings Section
-
-    private var settingsSection: some View {
-        DisclosureGroup(isExpanded: $settingsExpanded) {
-            VStack(spacing: 6) {
-                Toggle(AppConstants.Localizable.keyboardShortcuts, isOn: $settings.keyboardShortcutsEnabled)
-                    .font(.system(size: 11))
-
-                Toggle(AppConstants.Localizable.requireConfirmation, isOn: $settings.requireQuitConfirmation)
-                    .font(.system(size: 11))
-
-                Toggle(AppConstants.Localizable.hideIcon, isOn: $settings.hideMenuBarIcon)
-                    .font(.system(size: 11))
-
-                Divider()
-                    .padding(.vertical, 2)
-
-                Toggle(AppConstants.Localizable.memoryMonitoring, isOn: $settings.memoryPressureMonitoringEnabled)
-                    .font(.system(size: 11))
-
-                Toggle(AppConstants.Localizable.thermalMonitoring, isOn: $settings.thermalStateMonitoringEnabled)
-                    .font(.system(size: 11))
-
-                Toggle(AppConstants.Localizable.diskMonitoring, isOn: $settings.diskSpaceMonitoringEnabled)
-                    .font(.system(size: 11))
-
-                Toggle(AppConstants.Localizable.cpuMonitoring, isOn: $settings.cpuMonitoringEnabled)
-                    .font(.system(size: 11))
-
-                Toggle(AppConstants.Localizable.autoFreeMemory, isOn: $settings.autoFreeMemoryEnabled)
-                    .font(.system(size: 11))
-
-                Divider()
-                    .padding(.vertical, 2)
-
-                Toggle(AppConstants.Localizable.launchAtLogin, isOn: $launchAtLogin)
-                    .font(.system(size: 11))
-                    .onChange(of: launchAtLogin) { newValue in
-                        LoginItemsManager.setRegistered(newValue)
-                    }
-
-                Button(action: { showIgnoredSheet = true }) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "eye.slash.fill")
-                            .font(.system(size: 10))
-                        Text(AppConstants.Localizable.manageIgnored)
-                            .font(.system(size: 10))
-                    }
-                    .foregroundColor(.secondary)
-                }
-                .buttonStyle(.plain)
-            }
-            .padding(.horizontal, AppConstants.headerPaddingH)
-        } label: {
-            HStack {
-                Image(systemName: "gear")
-                    .foregroundColor(.secondary)
-                    .font(.system(size: 12))
-                Text("Settings")
-                    .font(.system(size: 11, weight: .medium))
-                Spacer()
-                Image(systemName: settingsExpanded ? "chevron.down" : "chevron.right")
-                    .font(.system(size: 10))
-                    .foregroundColor(.secondary)
-            }
-            .contentShape(Rectangle())
-            .onTapGesture {
-                settingsExpanded.toggle()
-            }
-        }
-        .padding(.horizontal, AppConstants.headerPaddingH)
-        .padding(.vertical, 8)
-    }
-
     // MARK: - Footer
 
     private var footerView: some View {
-        VStack(spacing: 6) {
-            HStack(spacing: 8) {
-                Button(action: {
-                    onDismiss()
-                    DispatchQueue.main.async { processManager.minimizeAllApps() }
-                }) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "arrow.down.square")
-                            .font(.system(size: 12))
-                        Text(AppConstants.Localizable.minimizeAll)
-                            .font(.system(size: 12))
-                    }
-                    .foregroundColor(.primary)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 7)
-                }
-                .buttonStyle(.plain)
+        VStack(spacing: 0) {
+            Divider()
 
-                Button(action: { handleQuitAll() }) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 12))
-                        Text(AppConstants.Localizable.quitAll)
-                            .font(.system(size: 12))
+            VStack(spacing: 8) {
+                HStack(spacing: 8) {
+                    nativeButton(
+                        title: AppConstants.Localizable.minimizeAll,
+                        icon: "arrow.down.square",
+                        action: {
+                            onDismiss()
+                            DispatchQueue.main.async { processManager.minimizeAllApps() }
+                        }
+                    )
+
+                    nativeButton(
+                        title: AppConstants.Localizable.quitAll,
+                        icon: "xmark.circle.fill",
+                        role: .destructive,
+                        isProminent: true,
+                        action: handleQuitAll
+                    )
+                }
+
+                if processManager.selectedAppIds.isEmpty {
+                    HStack(spacing: 0) {
+                        Spacer()
+                        nativeButton(
+                            title: AppConstants.Localizable.settings,
+                            icon: "gearshape.fill",
+                            action: { showSettings = true }
+                        )
+                        Spacer()
                     }
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 7)
-                    .background(Color.red)
-                    .cornerRadius(AppConstants.cornerRadius)
+                } else {
+                    HStack(spacing: 6) {
+                        Button(action: {
+                            onDismiss()
+                            DispatchQueue.main.async { processManager.quitSelectedApps(force: false) }
+                        }) {
+                            Label(
+                                "\(AppConstants.Localizable.quitSelected) (\(processManager.selectedAppIds.count))",
+                                systemImage: "checkmark.circle"
+                            )
+                            .font(.system(size: 11, weight: .medium))
+                        }
+                        .buttonStyle(BorderedProminentButtonStyle())
+                        .tint(.blue)
+                        .controlSize(.small)
+
+                        Spacer()
+
+                        Button(action: {
+                            onDismiss()
+                            DispatchQueue.main.async { processManager.quitSelectedApps(force: true) }
+                        }) {
+                            Image(systemName: "bolt.fill")
+                                .font(.system(size: 11, weight: .semibold))
+                                .frame(width: 22, height: 22)
+                        }
+                        .buttonStyle(BorderedButtonStyle())
+                        .tint(.orange)
+                        .controlSize(.small)
+                        .help(AppConstants.Localizable.forceQuit)
+
+                        Button(action: { showSettings = true }) {
+                            Image(systemName: "gearshape.fill")
+                                .font(.system(size: 11, weight: .medium))
+                                .frame(width: 22, height: 22)
+                        }
+                        .buttonStyle(BorderedButtonStyle())
+                        .tint(.gray)
+                        .controlSize(.small)
+                        .help(AppConstants.Localizable.settings)
+                    }
+                }
+
+                Button(action: { NSApplication.shared.terminate(nil) }) {
+                    Label(AppConstants.Localizable.quitCloseAll, systemImage: "power")
+                        .font(.system(size: 9))
+                        .foregroundColor(.secondary)
                 }
                 .buttonStyle(.plain)
+                .opacity(0.45)
             }
-
-            HStack(spacing: 8) {
-                Button(action: {
-                    onDismiss()
-                    DispatchQueue.main.async { processManager.quitSelectedApps(force: false) }
-                }) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "xmark.circle")
-                            .font(.system(size: 11))
-                        Text("\(AppConstants.Localizable.quitSelected) (\(processManager.selectedAppIds.count))")
-                            .font(.system(size: 11))
-                    }
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 6)
-                    .background(Color.blue)
-                    .cornerRadius(AppConstants.cornerRadius)
-                }
-                .buttonStyle(.plain)
-                .disabled(processManager.selectedAppIds.isEmpty)
-
-                Button(action: {
-                    onDismiss()
-                    DispatchQueue.main.async { processManager.quitSelectedApps(force: true) }
-                }) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "xmark.octagon.fill")
-                            .font(.system(size: 11))
-                        Text(AppConstants.Localizable.force)
-                            .font(.system(size: 11))
-                    }
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 6)
-                    .background(Color.orange)
-                    .cornerRadius(AppConstants.cornerRadius)
-                }
-                .buttonStyle(.plain)
-                .disabled(processManager.selectedAppIds.isEmpty)
-            }
-
-            Button(action: { NSApplication.shared.terminate(nil) }) {
-                HStack(spacing: 4) {
-                    Image(systemName: "power")
-                        .font(.system(size: 10))
-                    Text(AppConstants.Localizable.quitCloseAll)
-                        .font(.system(size: 10))
-                }
-                .foregroundColor(.secondary)
-            }
-            .buttonStyle(.plain)
+            .padding(.horizontal, AppConstants.footerPaddingH)
+            .padding(.vertical, 8)
         }
-        .padding(.horizontal, AppConstants.footerPaddingH)
-        .padding(.vertical, 8)
+        .background(.ultraThinMaterial)
+    }
+
+    @ViewBuilder
+    private func nativeButton(
+        title: String,
+        icon: String,
+        role: ButtonRole? = nil,
+        isProminent: Bool = false,
+        action: @escaping () -> Void
+    ) -> some View {
+        if isProminent {
+            Button(role: role, action: action) {
+                Label(title, systemImage: icon)
+                    .font(.system(size: 11, weight: .medium))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 2)
+            }
+            .buttonStyle(BorderedProminentButtonStyle())
+            .tint(.red)
+            .controlSize(.small)
+        } else {
+            Button(role: role, action: action) {
+                Label(title, systemImage: icon)
+                    .font(.system(size: 11, weight: .medium))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 2)
+            }
+            .buttonStyle(BorderedButtonStyle())
+            .controlSize(.small)
+        }
     }
 
     private func handleQuitAll() {
         onDismiss()
-        if settings.requireQuitConfirmation {
+        if requireQuitConfirmation {
             showQuitAllAlert()
         } else {
             DispatchQueue.main.async { processManager.quitAllApps() }
@@ -551,6 +691,46 @@ struct PopoverContentView: View {
 
     private func performQuitSelected(force: Bool) {
         let errors = processManager.quitSelectedApps(force: force)
+    }
+
+    private func checkbox(_ label: String, isOn: Binding<Bool>) -> some View {
+        Button(action: { isOn.wrappedValue.toggle() }) {
+            HStack(spacing: 6) {
+                Image(systemName: isOn.wrappedValue ? "checkmark.square.fill" : "square")
+                    .foregroundColor(isOn.wrappedValue ? .accentColor : .secondary)
+                    .font(.system(size: 13))
+                Text(label)
+                    .foregroundColor(.primary)
+                Spacer()
+            }
+            .contentShape(Rectangle())
+            .padding(.vertical, 2)
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+extension View {
+    func toolTip(_ tip: String) -> some View {
+        self.overlay(
+            ToolTipView(tip: tip)
+                .frame(width: 0, height: 0)
+                .allowsHitTesting(false)
+        )
+    }
+}
+
+private struct ToolTipView: NSViewRepresentable {
+    let tip: String
+
+    func makeNSView(context: Context) -> NSView {
+        let v = NSView()
+        v.toolTip = tip
+        return v
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        nsView.toolTip = tip
     }
 }
 

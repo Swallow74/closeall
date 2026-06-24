@@ -84,14 +84,15 @@ final class DiskSpaceManager: ObservableObject {
     }
 
     private func diskInfo() -> (free: Double, total: Double) {
-        let paths = NSSearchPathForDirectoriesInDomains(.documentDirectory, .userDomainMask, true)
-        guard let path = paths.first else { return (0, 0) }
-
+        let rootURL = URL(fileURLWithPath: "/")
         do {
-            let attrs = try FileManager.default.attributesOfFileSystem(forPath: path)
-            let free = (attrs[.systemFreeSize] as? NSNumber)?.doubleValue ?? 0
-            let total = (attrs[.systemSize] as? NSNumber)?.doubleValue ?? 0
-            return (free / 1_073_741_824, total / 1_073_741_824)
+            let values = try rootURL.resourceValues(forKeys: [
+                .volumeTotalCapacityKey,
+                .volumeAvailableCapacityForImportantUsageKey
+            ])
+            let total = (values.volumeTotalCapacity ?? 0)
+            let free = (values.volumeAvailableCapacityForImportantUsage ?? 0)
+            return (Double(free) / 1_073_741_824, Double(total) / 1_073_741_824)
         } catch {
             return (0, 0)
         }

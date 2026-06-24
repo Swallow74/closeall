@@ -12,8 +12,19 @@ final class StatusBarController: NSObject {
     private let thermalManager = ThermalStateManager.shared
     private let diskManager = DiskSpaceManager.shared
     private let cpuManager = CPUManager.shared
+    private let gpuManager = GPUManager.shared
     private var monitorCancellables = Set<AnyCancellable>()
     private let clickMenu = NSMenu()
+
+    private var cycleTimer: Timer?
+    private var cycleIndex: Int = 0
+    private var cycleItems: [AlertItem] = []
+
+    private struct AlertItem {
+        let symbol: String
+        let color: NSColor?
+        var isCustomIcon: Bool { symbol == "_gpu" }
+    }
 
     override init() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -48,6 +59,8 @@ final class StatusBarController: NSObject {
             diskManager.$isWarningActive.eraseToAnyPublisher(),
             cpuManager.$isWarningActive.eraseToAnyPublisher(),
             cpuManager.$isCritical.eraseToAnyPublisher(),
+            gpuManager.$isWarningActive.eraseToAnyPublisher(),
+            gpuManager.$isCritical.eraseToAnyPublisher(),
         ]
         Publishers.MergeMany(publishers)
             .receive(on: DispatchQueue.main)
@@ -74,44 +87,81 @@ final class StatusBarController: NSObject {
         guard let btn = button else { return }
         let config = NSImage.SymbolConfiguration(pointSize: 16, weight: .regular)
 
+        var items: [AlertItem] = []
+
         if memoryManager.isCritical {
-            setButtonImage(btn, "exclamationmark.octagon.fill", config, .systemRed,
-                           "Memory critically low: %.0f%%", memoryManager.freeMemoryPercentage * 100)
-        } else if thermalManager.isCritical {
-            setButtonImage(btn, "thermometer.sun.fill", config, .systemRed,
-                           "Thermal state: Critical")
-        } else if diskManager.isCritical {
-            setButtonImage(btn, "externaldrive.badge.exclamationmark", config, .systemRed,
-                           "Disk space critically low: %.1f GB free", diskManager.freeGB)
-        } else if memoryManager.isWarningActive {
-            setButtonImage(btn, "exclamationmark.triangle.fill", config, nil,
-                           "Memory: %.0f%% free", memoryManager.freeMemoryPercentage * 100)
-        } else if cpuManager.isCritical {
-            setButtonImage(btn, "cpu.fill", config, .systemRed,
-                           "CPU: %.0f%%", cpuManager.globalCPUPercent)
-        } else if cpuManager.isWarningActive {
-            setButtonImage(btn, "cpu.fill", config, .systemOrange,
-                           "CPU: %.0f%%", cpuManager.globalCPUPercent)
-        } else if thermalManager.isWarningActive {
-            setButtonImage(btn, "thermometer.sun.fill", config, .systemOrange,
-                           "Thermal state: %@", thermalManager.localizedState)
-        } else if diskManager.isWarningActive {
-            setButtonImage(btn, "externaldrive.badge.exclamationmark", config, .systemOrange,
-                           "Disk space: %.1f GB free", diskManager.freeGB)
-        } else {
+            items.append(AlertItem(symbol: "exclamationmark.octagon.fill", color: .systemRed))
+        }
+        if thermalManager.isCritical {
+            items.append(AlertItem(symbol: "thermometer.sun.fill", color: .systemRed))
+        }
+        if diskManager.isCritical {
+            items.append(AlertItem(symbol: "externaldrive.badge.exclamationmark", color: .systemRed))
+        }
+        if cpuManager.isCritical {
+            items.append(AlertItem(symbol: "cpu.fill", color: .systemRed))
+        }
+        if gpuManager.isCritical {
+            items.append(AlertItem(symbol: "_gpu", color: .systemRed))
+        }
+        if memoryManager.isWarningActive {
+            items.append(AlertItem(symbol: "exclamationmark.triangle.fill", color: nil))
+        }
+        if cpuManager.isWarningActive {
+            items.append(AlertItem(symbol: "cpu.fill", color: .systemOrange))
+        }
+        if gpuManager.isWarningActive {
+            items.append(AlertItem(symbol: "_gpu", color: .systemOrange))
+        }
+        if thermalManager.isWarningActive {
+            items.append(AlertItem(symbol: "thermometer.sun.fill", color: .systemOrange))
+        }
+        if diskManager.isWarningActive {
+            items.append(AlertItem(symbol: "externaldrive.badge.exclamationmark", color: .systemOrange))
+        }
+
+        cycleTimer?.invalidate()
+        cycleTimer = nil
+
+        if items.isEmpty {
             setButtonImage(btn, AppConstants.Localizable.statusBarSymbol, config, nil)
+            cycleItems = []
+        } else if items.count == 1 {
+            let item = items[0]
+            setButtonImage(btn, item.symbol, config, item.color)
+            cycleItems = []
+        } else {
+            cycleItems = items
+            cycleIndex = 0
+            applyCycleItem(btn, config)
+            cycleTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+                guard let self = self, let btn = self.button else { return }
+                self.cycleIndex = (self.cycleIndex + 1) % self.cycleItems.count
+                self.applyCycleItem(btn, config)
+            }
         }
 
         btn.toolTip = buildTooltip()
     }
 
+    private func applyCycleItem(_ btn: NSStatusBarButton, _ config: NSImage.SymbolConfiguration) {
+        guard !cycleItems.isEmpty else { return }
+        let item = cycleItems[cycleIndex % cycleItems.count]
+        setButtonImage(btn, item.symbol, config, item.color)
+    }
+
     private func setButtonImage(_ btn: NSStatusBarButton, _ symbol: String, _ config: NSImage.SymbolConfiguration,
-                                _ tint: NSColor?, _ format: String? = nil, _ args: CVarArg...) {
-        let image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)!
-            .withSymbolConfiguration(config)!
-        image.isTemplate = tint == nil
-        btn.image = image
-        btn.contentTintColor = tint
+                                _ tint: NSColor?) {
+        if symbol == "_gpu" {
+            btn.image = GPUIconHelper.icon(tint: tint)
+            btn.contentTintColor = nil
+        } else {
+            let image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)!
+                .withSymbolConfiguration(config)!
+            image.isTemplate = tint == nil
+            btn.image = image
+            btn.contentTintColor = tint
+        }
     }
 
     private func buildTooltip() -> String {
@@ -146,6 +196,14 @@ final class StatusBarController: NSObject {
                 lines.append(String(format: AppConstants.Localizable.cpuPressureBad, cpuManager.globalCPUPercent))
             } else {
                 lines.append(String(format: AppConstants.Localizable.cpuPressureGood, cpuManager.globalCPUPercent))
+            }
+        }
+
+        if AppSettings.shared.gpuMonitoringEnabled {
+            if gpuManager.isWarningActive {
+                lines.append(String(format: AppConstants.Localizable.gpuPressureBad, gpuManager.gpuUtilizationPercent))
+            } else {
+                lines.append(String(format: AppConstants.Localizable.gpuPressureGood, gpuManager.gpuUtilizationPercent))
             }
         }
 

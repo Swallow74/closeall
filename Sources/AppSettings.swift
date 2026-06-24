@@ -32,6 +32,10 @@ final class AppSettings: ObservableObject {
         didSet { UserDefaults.standard.set(cpuMonitoringEnabled, forKey: AppConstants.UserDefaultsKeys.cpuMonitoring) }
     }
 
+    @Published var gpuMonitoringEnabled: Bool {
+        didSet { UserDefaults.standard.set(gpuMonitoringEnabled, forKey: AppConstants.UserDefaultsKeys.gpuMonitoring) }
+    }
+
     @Published var autoFreeMemoryEnabled: Bool {
         didSet { UserDefaults.standard.set(autoFreeMemoryEnabled, forKey: AppConstants.UserDefaultsKeys.autoFreeMemory) }
     }
@@ -58,6 +62,7 @@ final class AppSettings: ObservableObject {
             AppConstants.UserDefaultsKeys.diskSpace: false,
             AppConstants.UserDefaultsKeys.diskSpaceThreshold: AppConstants.defaultDiskSpaceThreshold,
             AppConstants.UserDefaultsKeys.cpuMonitoring: false,
+            AppConstants.UserDefaultsKeys.gpuMonitoring: false,
             AppConstants.UserDefaultsKeys.autoFreeMemory: false,
         ])
         
@@ -68,6 +73,7 @@ final class AppSettings: ObservableObject {
         thermalStateMonitoringEnabled = UserDefaults.standard.bool(forKey: AppConstants.UserDefaultsKeys.thermalState)
         diskSpaceMonitoringEnabled = UserDefaults.standard.bool(forKey: AppConstants.UserDefaultsKeys.diskSpace)
         cpuMonitoringEnabled = UserDefaults.standard.bool(forKey: AppConstants.UserDefaultsKeys.cpuMonitoring)
+        gpuMonitoringEnabled = UserDefaults.standard.bool(forKey: AppConstants.UserDefaultsKeys.gpuMonitoring)
         autoFreeMemoryEnabled = UserDefaults.standard.bool(forKey: AppConstants.UserDefaultsKeys.autoFreeMemory)
 
         Publishers.CombineLatest3(
@@ -90,6 +96,7 @@ final class AppSettings: ObservableObject {
         thermalStateMonitoringEnabled = UserDefaults.standard.bool(forKey: AppConstants.UserDefaultsKeys.thermalState)
         diskSpaceMonitoringEnabled = UserDefaults.standard.bool(forKey: AppConstants.UserDefaultsKeys.diskSpace)
         cpuMonitoringEnabled = UserDefaults.standard.bool(forKey: AppConstants.UserDefaultsKeys.cpuMonitoring)
+        gpuMonitoringEnabled = UserDefaults.standard.bool(forKey: AppConstants.UserDefaultsKeys.gpuMonitoring)
         autoFreeMemoryEnabled = UserDefaults.standard.bool(forKey: AppConstants.UserDefaultsKeys.autoFreeMemory)
     }
 }
