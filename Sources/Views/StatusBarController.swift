@@ -6,19 +6,22 @@ final class StatusBarController {
     private var statusItem: NSStatusItem
     private weak var button: NSStatusBarButton?
     private let contextMenu: NSMenu = NSMenu()
-    private var popover: NSPopover
+    private var popoverWindow: NSWindow?
+    private var eventMonitor: Any?
     private let processManager = ProcessManager.shared
     private let memoryManager = MemoryPressureManager.shared
     private var memoryCancellable: AnyCancellable?
     private var memoryCriticalCancellable: AnyCancellable?
 
+    private var isPopoverShown: Bool {
+        popoverWindow?.isVisible == true
+    }
+
     init() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        popover = NSPopover()
 
         setupStatusBarButton()
         setupContextMenu()
-        setupPopover()
         applyIconVisibility()
 
         NotificationCenter.default.addObserver(
@@ -119,16 +122,8 @@ final class StatusBarController {
         settingsItem.target = self
     }
 
-    private func setupPopover() {
-        popover.contentSize = NSSize(width: AppConstants.popoverWidth, height: AppConstants.popoverHeight)
-        popover.behavior = .semitransient
-        popover.contentViewController = NSHostingController(
-            rootView: PopoverContentView(processManager: processManager, onDismiss: { [weak self] in self?.closePopover() })
-        )
-    }
-
     @objc private func handleLeftClick() {
-        if popover.isShown {
+        if isPopoverShown {
             closePopover()
         } else {
             showPopover()
@@ -143,15 +138,63 @@ final class StatusBarController {
     private func showPopover() {
         guard let btn = button else { return }
         closePopover()
-        DispatchQueue.main.async { [weak self] in
-            guard let self, let btn = self.button else { return }
-            self.popover.show(relativeTo: btn.bounds, of: btn, preferredEdge: .minY)
-            self.processManager.refreshRunningApps()
+
+        let popoverContent = PopoverContentView(
+            processManager: processManager,
+            onDismiss: { [weak self] in self?.closePopover() }
+        )
+        let hostingController = NSHostingController(rootView: popoverContent)
+
+        let contentSize = NSSize(width: AppConstants.popoverWidth, height: AppConstants.popoverHeight)
+        hostingController.view.frame.size = contentSize
+
+        let window = NSPanel(contentViewController: hostingController)
+        window.styleMask = [.borderless]
+        window.level = .statusBar
+        window.collectionBehavior = [.transient, .ignoresCycle, .fullScreenAuxiliary]
+        window.isReleasedWhenClosed = false
+        window.backgroundColor = NSColor.windowBackgroundColor
+        window.hasShadow = true
+        window.isOpaque = true
+        window.hidesOnDeactivate = true
+        window.setFrame(NSRect(origin: .zero, size: contentSize), display: false)
+
+        let screen = btn.window?.screen ?? NSScreen.main ?? NSScreen.screens[0]
+        let btnFrameInWindow = btn.convert(btn.bounds, to: nil)
+        let btnFrameOnScreen = btn.window!.convertToScreen(btnFrameInWindow)
+        var origin = NSPoint(
+            x: btnFrameOnScreen.midX - contentSize.width / 2,
+            y: btnFrameOnScreen.minY - contentSize.height - 4
+        )
+        let visibleFrame = screen.visibleFrame
+        if origin.x < visibleFrame.minX + 4 {
+            origin.x = visibleFrame.minX + 4
+        } else if origin.x + contentSize.width > visibleFrame.maxX - 4 {
+            origin.x = visibleFrame.maxX - contentSize.width - 4
         }
+        window.setFrameOrigin(origin)
+
+        popoverWindow = window
+        window.makeKeyAndOrderFront(nil)
+
+        eventMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
+            guard let self, let popoverWindow = self.popoverWindow else { return event }
+            if event.window?.windowNumber != popoverWindow.windowNumber {
+                self.closePopover()
+            }
+            return event
+        }
+
+        processManager.refreshRunningApps()
     }
 
     private func closePopover() {
-        popover.performClose(nil)
+        if let monitor = eventMonitor {
+            NSEvent.removeMonitor(monitor)
+            eventMonitor = nil
+        }
+        popoverWindow?.close()
+        popoverWindow = nil
     }
 
     // MARK: - Context menu actions
