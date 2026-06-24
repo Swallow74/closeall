@@ -364,16 +364,21 @@ struct PopoverContentView: View {
                     )
                 }
                 if gpuMonitoringEnabled {
-                    compactIndicator(
-                        icon: "square.grid.3x3.fill",
-                        color: gpuManager.isCritical ? .red :
-                            gpuManager.isWarningActive ? .orange : .primary,
-                        text: String(format: "%.0f%%", gpuManager.gpuUtilizationPercent),
-                        help: String(
-                            format: "GPU: %.0f%%\nGPU utilization",
-                            gpuManager.gpuUtilizationPercent
-                        )
-                    )
+                    let gpuTint: NSColor? = gpuManager.isCritical ? .systemRed :
+                        gpuManager.isWarningActive ? .systemOrange : nil
+                    HStack(spacing: 4) {
+                        Image(nsImage: GPUIconHelper.icon(tint: gpuTint, size: NSSize(width: 12, height: 12)))
+                            .resizable()
+                            .frame(width: 12, height: 12)
+                        Text(String(format: "%.0f%%", gpuManager.gpuUtilizationPercent))
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(.secondary)
+                    }
+                    .contentShape(Rectangle())
+                    .toolTip(String(
+                        format: "GPU: %.0f%%\nGPU utilization",
+                        gpuManager.gpuUtilizationPercent
+                    ))
                 }
                 if memoryPressureMonitoringEnabled {
                     compactIndicator(
