@@ -2,6 +2,8 @@
 
 CloseAll is a lightweight macOS menu bar app that lets you quit all running applications with a single click, with real-time system monitoring (memory, CPU, GPU, disk, thermal).
 
+![CloseAll Screenshot](screenshot.png)
+
 ## Project Structure
 
 ```

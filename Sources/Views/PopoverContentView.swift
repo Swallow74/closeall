@@ -317,14 +317,27 @@ struct PopoverContentView: View {
                 )
             }
             if gpuManager.isWarningActive && gpuMonitoringEnabled {
-                warningBanner(
-                    icon: "square.grid.3x3.fill",
-                    color: gpuManager.isCritical ? .red : .orange,
-                    text: String(
+                let gpuBannerColor: Color = gpuManager.isCritical ? .red : .orange
+                HStack(spacing: 8) {
+                    Image(nsImage: GPUIconHelper.icon(
+                        tint: gpuManager.isCritical ? .systemRed : .systemOrange,
+                        size: NSSize(width: 12, height: 12)
+                    ))
+                    .resizable()
+                    .frame(width: 14, height: 14)
+                    Text(String(
                         format: AppConstants.Localizable.gpuWarningMessage,
                         gpuManager.gpuUtilizationPercent
-                    )
-                )
+                    ))
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(.white)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    Spacer()
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(gpuBannerColor.opacity(0.85))
             }
         }
     }
