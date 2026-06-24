@@ -613,15 +613,55 @@ struct PopoverContentView: View {
         return rows
     }
 
+    private var filteredRows: [CombinedRow] {
+        let q = searchText.lowercased()
+        var matchingAppIDs = Set<String>()
+        var appIDsWithMatchingChildren = Set<String>()
+        var currentAppID: String?
+        var hasMatchingOrphans = false
+
+        for row in combinedRows {
+            switch row.type {
+            case .app(let app, _):
+                currentAppID = app.id
+                if app.name.lowercased().contains(q) {
+                    matchingAppIDs.insert(app.id)
+                }
+            case .child(let name, _):
+                if name.lowercased().contains(q), let currentAppID {
+                    appIDsWithMatchingChildren.insert(currentAppID)
+                }
+            case .orphan(let name, _):
+                if name.lowercased().contains(q) {
+                    hasMatchingOrphans = true
+                }
+            case .divider:
+                break
+            }
+        }
+
+        let keepApps = matchingAppIDs.union(appIDsWithMatchingChildren)
+        currentAppID = nil
+
+        return combinedRows.filter { row in
+            switch row.type {
+            case .app(let app, _):
+                currentAppID = app.id
+                return keepApps.contains(app.id)
+            case .child:
+                return keepApps.contains(currentAppID ?? "")
+            case .orphan(let name, _):
+                return name.lowercased().contains(q)
+            case .divider:
+                return hasMatchingOrphans
+            }
+        }
+    }
+
     private var appListView: some View {
         ScrollView {
             LazyVStack(spacing: 2) {
-                let rows = searchText.isEmpty ? combinedRows : combinedRows.filter {
-                    if case .app(let app, _) = $0.type {
-                        return app.name.localizedCaseInsensitiveContains(searchText)
-                    }
-                    return false
-                }
+                let rows = searchText.isEmpty ? combinedRows : filteredRows
 
                 ForEach(rows) { row in
                     switch row.type {

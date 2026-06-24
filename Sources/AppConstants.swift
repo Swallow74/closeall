@@ -55,7 +55,7 @@ enum AppConstants {
         static let deselectAll            = "Deselect All"
         static let quitSelected           = "Quit Selected"
         static let force                  = "Force"
-        static let searchPlaceholder      = "Search apps..."
+        static let searchPlaceholder      = "Search apps & processes"
         static let launchAtLogin          = "Launch at login"
         static let quitCloseAll           = "Quit CloseAll"
         static let ignoreApp              = "Ignore app"
