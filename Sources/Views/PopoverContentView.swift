@@ -5,17 +5,22 @@ struct PopoverContentView: View {
     @ObservedObject var processManager: ProcessManager
     @StateObject private var settings = AppSettings.shared
     @ObservedObject private var memoryManager = MemoryPressureManager.shared
+    @ObservedObject private var thermalManager = ThermalStateManager.shared
+    @ObservedObject private var diskManager = DiskSpaceManager.shared
+    @ObservedObject private var cpuManager = CPUManager.shared
     var onDismiss: () -> Void = {}
 
     @State private var searchText = ""
     @State private var showQuitConfirm = false
     @State private var showForceQuitConfirm = false
     @State private var quitErrors: [QuitError] = []
+    @State private var settingsExpanded = false
+    @State private var launchAtLogin: Bool = LoginItemsManager.isRegistered
 
     var body: some View {
         VStack(spacing: 0) {
-            if memoryManager.isWarningActive && settings.memoryPressureMonitoringEnabled {
-                memoryWarningBanner
+            if anyWarningActive {
+                warningBanners
             }
             headerView
             Divider()
@@ -47,24 +52,78 @@ struct PopoverContentView: View {
         }
     }
 
-    private var memoryWarningBanner: some View {
+    private var anyWarningActive: Bool {
+        (memoryManager.isWarningActive && settings.memoryPressureMonitoringEnabled) ||
+        (thermalManager.isWarningActive && settings.thermalStateMonitoringEnabled) ||
+        (diskManager.isWarningActive && settings.diskSpaceMonitoringEnabled) ||
+        (cpuManager.isWarningActive && settings.cpuMonitoringEnabled)
+    }
+
+    @ViewBuilder
+    private var warningBanners: some View {
+        VStack(spacing: 1) {
+            if memoryManager.isWarningActive && settings.memoryPressureMonitoringEnabled {
+                warningBanner(
+                    icon: "exclamationmark.triangle.fill",
+                    color: memoryManager.isCritical ? .red : .orange,
+                    text: String(
+                        format: AppConstants.Localizable.memoryWarningMessage,
+                        memoryManager.freeMemoryPercentage * 100,
+                        memoryManager.freeMemoryGB,
+                        memoryManager.totalMemoryGB
+                    )
+                )
+            }
+            if thermalManager.isWarningActive && settings.thermalStateMonitoringEnabled {
+                warningBanner(
+                    icon: "thermometer.sun.fill",
+                    color: thermalManager.isCritical ? .red : .orange,
+                    text: String(
+                        format: AppConstants.Localizable.thermalWarningMessage,
+                        thermalManager.localizedState
+                    )
+                )
+            }
+            if diskManager.isWarningActive && settings.diskSpaceMonitoringEnabled {
+                warningBanner(
+                    icon: "externaldrive.badge.exclamationmark",
+                    color: diskManager.isCritical ? .red : .orange,
+                    text: String(
+                        format: AppConstants.Localizable.diskWarningMessage,
+                        diskManager.freePercentage * 100,
+                        diskManager.freeGB,
+                        diskManager.totalGB
+                    )
+                )
+            }
+            if cpuManager.isWarningActive && settings.cpuMonitoringEnabled {
+                warningBanner(
+                    icon: "cpu.fill",
+                    color: cpuManager.isCritical ? .red : .orange,
+                    text: String(
+                        format: AppConstants.Localizable.cpuWarningMessage,
+                        cpuManager.globalCPUPercent
+                    )
+                )
+            }
+        }
+    }
+
+    private func warningBanner(icon: String, color: Color, text: String) -> some View {
         HStack(spacing: 8) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundColor(.yellow)
-                .font(.system(size: 14))
-            Text(String(
-                format: AppConstants.Localizable.memoryWarningMessage,
-                memoryManager.freeMemoryPercentage * 100,
-                memoryManager.freeMemoryGB,
-                memoryManager.totalMemoryGB
-            ))
-            .font(.system(size: 11, weight: .medium))
-            .foregroundColor(.white)
+            Image(systemName: icon)
+                .foregroundColor(color)
+                .font(.system(size: 12))
+            Text(text)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundColor(.white)
+                .lineLimit(1)
+                .truncationMode(.tail)
             Spacer()
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(Color.red.opacity(0.85))
+        .padding(.vertical, 6)
+        .background(color.opacity(0.85))
     }
 
     private var headerView: some View {
@@ -93,7 +152,45 @@ struct PopoverContentView: View {
                         .foregroundColor(.secondary)
 
                     if settings.memoryPressureMonitoringEnabled {
-                        memoryIndicatorView
+                        compactIndicator(
+                            color: memoryPressureColor,
+                            text: String(format: "%.0f%%", memoryManager.freeMemoryPercentage * 100),
+                            help: String(
+                                format: "Free: %.1f GB / %.1f GB — Used: %.1f GB",
+                                memoryManager.freeMemoryGB,
+                                memoryManager.totalMemoryGB,
+                                memoryManager.usedMemoryGB
+                            )
+                        )
+                    }
+                    if settings.thermalStateMonitoringEnabled {
+                        let thermalColor: Color = thermalManager.isCritical ? .red :
+                            thermalManager.isWarningActive ? .orange : .green
+                        compactIndicator(
+                            color: thermalColor,
+                            text: thermalStateShortLabel(thermalManager.thermalState),
+                            help: String(format: AppConstants.Localizable.thermalGood, thermalManager.localizedState)
+                        )
+                    }
+                    if settings.diskSpaceMonitoringEnabled && diskManager.totalGB > 0 {
+                        compactIndicator(
+                            color: diskManager.isCritical ? .red :
+                                diskManager.isWarningActive ? .orange : .green,
+                            text: String(format: "%.0f%%", diskManager.freePercentage * 100),
+                            help: String(
+                                format: "Free: %.1f GB / %.1f GB",
+                                diskManager.freeGB,
+                                diskManager.totalGB
+                            )
+                        )
+                    }
+                    if settings.cpuMonitoringEnabled {
+                        compactIndicator(
+                            color: cpuManager.isCritical ? .red :
+                                cpuManager.isWarningActive ? .orange : .green,
+                            text: String(format: "%.0f%%", cpuManager.globalCPUPercent),
+                            help: "Global CPU usage"
+                        )
                     }
                 }
             }
@@ -109,21 +206,26 @@ struct PopoverContentView: View {
         }
     }
 
-    private var memoryIndicatorView: some View {
+    private func compactIndicator(color: Color, text: String, help: String) -> some View {
         HStack(spacing: 3) {
             Circle()
-                .fill(memoryPressureColor)
+                .fill(color)
                 .frame(width: 5, height: 5)
-            Text(String(format: "%.0f%%", memoryManager.freeMemoryPercentage * 100))
+            Text(text)
                 .font(.system(size: 9, weight: .medium))
                 .foregroundColor(.secondary)
         }
-        .help(String(
-            format: "Free: %.1f GB / %.1f GB — Used: %.1f GB",
-            memoryManager.freeMemoryGB,
-            memoryManager.totalMemoryGB,
-            memoryManager.usedMemoryGB
-        ))
+        .help(help)
+    }
+
+    private func thermalStateShortLabel(_ state: ProcessInfo.ThermalState) -> String {
+        switch state {
+        case .nominal:  return "N"
+        case .fair:     return "F"
+        case .serious:  return "S"
+        case .critical: return "C"
+        @unknown default: return "?"
+        }
     }
 
     private var memoryPressureColor: Color {
@@ -133,7 +235,7 @@ struct PopoverContentView: View {
         return .green
     }
 
-private var appListView: some View {
+    private var appListView: some View {
         ScrollView {
             LazyVStack(spacing: 2) {
                 ForEach(filteredApps) { app in
@@ -142,6 +244,7 @@ private var appListView: some View {
                         isIgnored: processManager.ignoredBundleIdentifiers.contains(app.bundleIdentifier),
                         isSelected: processManager.selectedAppIds.contains(app.id),
                         isQuitting: processManager.isQuitting(app.id),
+                        cpuPercent: settings.cpuMonitoringEnabled ? cpuManager.cpuForBundleID(app.bundleIdentifier) : nil,
                         onQuit: { force in
                             processManager.quitApp(app, force: force)
                         },
@@ -196,8 +299,26 @@ private var appListView: some View {
                 Toggle(AppConstants.Localizable.hideIcon, isOn: $settings.hideMenuBarIcon)
                     .font(.system(size: 11))
 
+                Divider()
+                    .padding(.vertical, 2)
+
                 Toggle(AppConstants.Localizable.memoryMonitoring, isOn: $settings.memoryPressureMonitoringEnabled)
                     .font(.system(size: 11))
+
+                Toggle(AppConstants.Localizable.thermalMonitoring, isOn: $settings.thermalStateMonitoringEnabled)
+                    .font(.system(size: 11))
+
+                Toggle(AppConstants.Localizable.diskMonitoring, isOn: $settings.diskSpaceMonitoringEnabled)
+                    .font(.system(size: 11))
+
+                Toggle(AppConstants.Localizable.cpuMonitoring, isOn: $settings.cpuMonitoringEnabled)
+                    .font(.system(size: 11))
+
+                Toggle(AppConstants.Localizable.autoFreeMemory, isOn: $settings.autoFreeMemoryEnabled)
+                    .font(.system(size: 11))
+
+                Divider()
+                    .padding(.vertical, 2)
 
                 Toggle(AppConstants.Localizable.launchAtLogin, isOn: $launchAtLogin)
                     .font(.system(size: 11))
@@ -226,10 +347,6 @@ private var appListView: some View {
         .padding(.horizontal, AppConstants.headerPaddingH)
         .padding(.vertical, 8)
     }
-
-    @State private var settingsExpanded = false
-
-    @State private var launchAtLogin: Bool = LoginItemsManager.isRegistered
 
     // MARK: - Footer
 

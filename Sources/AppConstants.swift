@@ -24,6 +24,11 @@ enum AppConstants {
         static let hideMenuBarIcon       = "CloseAllHideMenuBarIcon"
         static let memoryPressure       = "CloseAllMemoryPressureMonitoringEnabled"
         static let memoryPressureThreshold = "CloseAllMemoryPressureThreshold"
+        static let thermalState         = "CloseAllThermalStateMonitoringEnabled"
+        static let diskSpace            = "CloseAllDiskSpaceMonitoringEnabled"
+        static let diskSpaceThreshold   = "CloseAllDiskSpaceThreshold"
+        static let cpuMonitoring        = "CloseAllCPUMonitoringEnabled"
+        static let autoFreeMemory       = "CloseAllAutoFreeMemoryEnabled"
     }
 
     enum BundleIdentifiers {
@@ -66,10 +71,30 @@ enum AppConstants {
         static let memoryMonitoring       = "Memory pressure monitoring"
         static let memoryPressureGood     = "Memory: %.0f%% free"
         static let memoryPressureBad      = "⚠ Memory: %.0f%% free"
+        static let thermalMonitoring       = "Thermal state monitoring"
+        static let diskMonitoring          = "Disk space monitoring"
+        static let cpuMonitoring           = "CPU monitoring"
+        static let autoFreeMemory          = "Auto-free memory when low"
+        static let diskWarningMessage      = "Low disk space: %.1f GB (%.0f%% of %.0f GB)"
+        static let thermalWarningMessage   = "System thermal state: %@"
+        static let cpuWarningMessage       = "High CPU usage: %.0f%%"
+        static let thermalStateNominal     = "Normal"
+        static let thermalStateFair        = "Fair"
+        static let thermalStateSerious     = "Serious"
+        static let thermalStateCritical    = "Critical"
+        static let diskPressureGood        = "Disk: %.0f%% free"
+        static let diskPressureBad         = "⚠ Disk: %.0f%% free"
+        static let thermalGood             = "Thermal: %@"
+        static let thermalBad              = "⚠ Thermal: %@"
+        static let cpuPressureGood         = "CPU: %.0f%%"
+        static let cpuPressureBad          = "⚠ CPU: %.0f%%"
     }
 
     static let memoryPressureCheckInterval: TimeInterval = 5.0
     static let defaultMemoryPressureThreshold: Double = 0.20
+    static let diskSpaceCheckInterval: TimeInterval = 60.0
+    static let defaultDiskSpaceThreshold: Double = 10.0
+    static let cpuCheckInterval: TimeInterval = 3.0
 
     struct Shortcuts {
         static let quitAll = KeyCombo(key: 0x0A, modifierFlags: [.control, .option, .command])

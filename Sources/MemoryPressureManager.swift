@@ -18,6 +18,7 @@ final class MemoryPressureManager: ObservableObject {
 
     private var timer: Timer?
     private var hasPostedWarning = false
+    private var hasAutoFreed = false
     private var cancellables = Set<AnyCancellable>()
 
     private init() {
@@ -28,6 +29,15 @@ final class MemoryPressureManager: ObservableObject {
                     self?.startMonitoring()
                 } else {
                     self?.stopMonitoring()
+                }
+            }
+            .store(in: &cancellables)
+
+        AppSettings.shared.$autoFreeMemoryEnabled
+            .dropFirst()
+            .sink { [weak self] enabled in
+                if !enabled {
+                    self?.hasAutoFreed = false
                 }
             }
             .store(in: &cancellables)
@@ -72,10 +82,15 @@ final class MemoryPressureManager: ObservableObject {
             if self.isWarningActive && !wasWarning && !self.hasPostedWarning {
                 self.hasPostedWarning = true
                 self.postWarningNotification()
+                if AppSettings.shared.autoFreeMemoryEnabled && !self.hasAutoFreed {
+                    self.hasAutoFreed = true
+                    self.performAutoFree()
+                }
             }
 
             if !self.isWarningActive {
                 self.hasPostedWarning = false
+                self.hasAutoFreed = false
             }
         }
     }
@@ -123,6 +138,67 @@ final class MemoryPressureManager: ObservableObject {
             content.sound = .default
             let request = UNNotificationRequest(
                 identifier: "memory-pressure-warning",
+                content: content,
+                trigger: nil
+            )
+            center.add(request)
+        }
+    }
+
+    private func performAutoFree() {
+        let frontApp = NSWorkspace.shared.frontmostApplication
+        let ownBundleID = Bundle.main.bundleIdentifier ?? ""
+        var freedCount = 0
+        var freedBytes: UInt64 = 0
+
+        for app in NSWorkspace.shared.runningApplications {
+            guard app.activationPolicy == .regular,
+                  let bundleID = app.bundleIdentifier,
+                  bundleID != ownBundleID,
+                  bundleID != AppConstants.BundleIdentifiers.finder,
+                  bundleID != frontApp?.bundleIdentifier,
+                  !ProcessManager.shared.ignoredBundleIdentifiers.contains(bundleID)
+            else { continue }
+
+            var task: mach_port_name_t = 0
+            if task_for_pid(mach_task_self_, app.processIdentifier, &task) == KERN_SUCCESS {
+                var info = task_basic_info_data_t()
+                var count = mach_msg_type_number_t(
+                    MemoryLayout<task_basic_info_data_t>.size / MemoryLayout<natural_t>.size
+                )
+                if withUnsafeMutablePointer(to: &info, {
+                    $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
+                        task_info(task, task_flavor_t(TASK_BASIC_INFO), $0, &count)
+                    }
+                }) == KERN_SUCCESS {
+                    freedBytes += UInt64(info.resident_size)
+                }
+                mach_port_deallocate(mach_task_self_, task)
+            }
+
+            app.terminate()
+            freedCount += 1
+        }
+
+        if freedCount > 0 {
+            let freedMB = Double(freedBytes) / 1_048_576
+            postAutoFreeNotification(count: freedCount, freedMB: freedMB)
+        }
+    }
+
+    private func postAutoFreeNotification(count: Int, freedMB: Double) {
+        let center = UNUserNotificationCenter.current()
+        center.requestAuthorization(options: [.alert, .sound]) { granted, _ in
+            guard granted else { return }
+            let content = UNMutableNotificationContent()
+            content.title = "Memory Auto-Freed"
+            content.body = String(
+                format: "Quit %d app(s), freed %.0f MB of memory",
+                count, freedMB
+            )
+            content.sound = .default
+            let request = UNNotificationRequest(
+                identifier: "auto-free-memory",
                 content: content,
                 trigger: nil
             )

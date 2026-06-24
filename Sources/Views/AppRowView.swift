@@ -6,6 +6,7 @@ struct AppRowView: View {
     let isIgnored: Bool
     let isSelected: Bool
     let isQuitting: Bool
+    let cpuPercent: Double?
     let onQuit: (Bool) -> Void
     let onToggleIgnore: () -> Void
     let onToggleSelect: () -> Void
@@ -36,6 +37,16 @@ struct AppRowView: View {
                 .lineLimit(1)
                 .truncationMode(.tail)
                 .frame(maxWidth: .infinity, alignment: .leading)
+
+            if let cpu = cpuPercent, cpu > 5 {
+                Text(String(format: "%.0f%%", cpu))
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundColor(cpuColor(cpu))
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 1)
+                    .background(cpuColor(cpu).opacity(0.1))
+                    .cornerRadius(3)
+            }
 
             if isHovering {
                 HStack(spacing: 4) {
@@ -79,5 +90,11 @@ struct AppRowView: View {
         )
         .cornerRadius(AppConstants.cornerRadius)
         .onHover { hovering in isHovering = hovering }
+    }
+
+    private func cpuColor(_ pct: Double) -> Color {
+        if pct > 50 { return .red }
+        if pct > 20 { return .orange }
+        return .secondary
     }
 }
