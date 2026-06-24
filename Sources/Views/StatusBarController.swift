@@ -2,26 +2,26 @@ import AppKit
 import SwiftUI
 import Combine
 
-final class StatusBarController {
+final class StatusBarController: NSObject {
     private var statusItem: NSStatusItem
     private weak var button: NSStatusBarButton?
     private let contextMenu: NSMenu = NSMenu()
-    private var popoverWindow: NSWindow?
-    private var eventMonitor: Any?
+    private var popover: NSPopover
     private let processManager = ProcessManager.shared
     private let memoryManager = MemoryPressureManager.shared
     private var memoryCancellable: AnyCancellable?
     private var memoryCriticalCancellable: AnyCancellable?
+    private let clickMenu = NSMenu()
 
-    private var isPopoverShown: Bool {
-        popoverWindow?.isVisible == true
-    }
-
-    init() {
+    override init() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        popover = NSPopover()
+
+        super.init()
 
         setupStatusBarButton()
         setupContextMenu()
+        setupPopover()
         applyIconVisibility()
 
         NotificationCenter.default.addObserver(
@@ -29,6 +29,13 @@ final class StatusBarController {
             selector: #selector(handleSettingsChanged),
             name: .settingsChanged,
             object: nil
+        )
+
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(popoverDidClose),
+            name: NSPopover.didCloseNotification,
+            object: popover
         )
 
         memoryCancellable = memoryManager.$isWarningActive
@@ -48,8 +55,9 @@ final class StatusBarController {
         guard let btn = statusItem.button else { return }
         button = btn
         updateButtonImage()
-        btn.action = #selector(handleLeftClick)
-        btn.target = self
+
+        clickMenu.delegate = self
+        statusItem.menu = clickMenu
 
         let rightClick = NSClickGestureRecognizer(target: self, action: #selector(handleRightClick))
         rightClick.buttonMask = 1 << 1
@@ -122,95 +130,63 @@ final class StatusBarController {
         settingsItem.target = self
     }
 
-    @objc private func handleLeftClick() {
-        if isPopoverShown {
-            closePopover()
-        } else {
-            showPopover()
-        }
+    private func setupPopover() {
+        popover.contentSize = NSSize(width: AppConstants.popoverWidth, height: AppConstants.popoverHeight)
+        popover.behavior = .transient
+        popover.contentViewController = NSHostingController(
+            rootView: PopoverContentView(processManager: processManager, onDismiss: { [weak self] in self?.closePopover() })
+        )
+    }
+
+    @objc private func popoverDidClose() {
+        statusItem.menu = clickMenu
     }
 
     @objc private func handleRightClick() {
+        closePopover()
         guard let btn = button else { return }
         contextMenu.popUp(positioning: nil, at: NSPoint(x: 0, y: btn.bounds.height), in: btn)
     }
 
+    @objc private func minimizeAllAction() {
+        DispatchQueue.main.async { self.processManager.minimizeAllApps() }
+    }
+
+    @objc private func quitAllAction() {
+        if AppSettings.shared.requireQuitConfirmation {
+            showQuitAllAlert()
+        } else {
+            DispatchQueue.main.async { self.processManager.quitAllApps() }
+        }
+    }
+
+    @objc private func openSettingsAction() {
+        showPopover()
+    }
+
     private func showPopover() {
         guard let btn = button else { return }
-        closePopover()
+        if popover.isShown { return }
+        statusItem.menu = nil
+        popover.show(relativeTo: btn.bounds, of: btn, preferredEdge: .minY)
 
-        let popoverContent = PopoverContentView(
-            processManager: processManager,
-            onDismiss: { [weak self] in self?.closePopover() }
-        )
-        let hostingController = NSHostingController(rootView: popoverContent)
-
-        let contentSize = NSSize(width: AppConstants.popoverWidth, height: AppConstants.popoverHeight)
-        hostingController.view.frame.size = contentSize
-
-        let window = NSPanel(contentViewController: hostingController)
-        window.styleMask = [.borderless]
-        window.level = .statusBar
-        window.collectionBehavior = [.transient, .ignoresCycle, .fullScreenAuxiliary]
-        window.isReleasedWhenClosed = false
-        window.backgroundColor = NSColor.windowBackgroundColor
-        window.hasShadow = true
-        window.isOpaque = true
-        window.hidesOnDeactivate = true
-        window.setFrame(NSRect(origin: .zero, size: contentSize), display: false)
-
-        let screen = btn.window?.screen ?? NSScreen.main ?? NSScreen.screens[0]
-        let btnFrameInWindow = btn.convert(btn.bounds, to: nil)
-        let btnFrameOnScreen = btn.window!.convertToScreen(btnFrameInWindow)
-        var origin = NSPoint(
-            x: btnFrameOnScreen.midX - contentSize.width / 2,
-            y: btnFrameOnScreen.minY - contentSize.height - 4
-        )
-        let visibleFrame = screen.visibleFrame
-        if origin.x < visibleFrame.minX + 4 {
-            origin.x = visibleFrame.minX + 4
-        } else if origin.x + contentSize.width > visibleFrame.maxX - 4 {
-            origin.x = visibleFrame.maxX - contentSize.width - 4
-        }
-        window.setFrameOrigin(origin)
-
-        popoverWindow = window
-        window.makeKeyAndOrderFront(nil)
-
-        eventMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
-            guard let self, let popoverWindow = self.popoverWindow else { return event }
-            if event.window?.windowNumber != popoverWindow.windowNumber {
-                self.closePopover()
-            }
-            return event
+        if let mainScreen = NSScreen.main,
+           let popoverWin = popover.contentViewController?.view.window {
+            let targetFrame = popoverWin.frame
+            let visibleFrame = mainScreen.visibleFrame
+            let x = min(max(targetFrame.origin.x, visibleFrame.minX + 4),
+                        visibleFrame.maxX - targetFrame.width - 4)
+            let y = visibleFrame.maxY - targetFrame.height - 4
+            popoverWin.setFrameOrigin(NSPoint(x: x, y: y))
         }
 
         processManager.refreshRunningApps()
     }
 
     private func closePopover() {
-        if let monitor = eventMonitor {
-            NSEvent.removeMonitor(monitor)
-            eventMonitor = nil
-        }
-        popoverWindow?.close()
-        popoverWindow = nil
-    }
-
-    // MARK: - Context menu actions
-
-    @objc private func minimizeAllAction() {
-        closePopover()
-        DispatchQueue.main.async { self.processManager.minimizeAllApps() }
-    }
-
-    @objc private func quitAllAction() {
-        closePopover()
-        if AppSettings.shared.requireQuitConfirmation {
-            showQuitAllAlert()
-        } else {
-            DispatchQueue.main.async { self.processManager.quitAllApps() }
-        }
+        guard popover.isShown else { return }
+        popover.performClose(nil)
+        statusItem.menu = clickMenu
     }
 
     private func showQuitAllAlert() {
@@ -220,18 +196,11 @@ final class StatusBarController {
         alert.addButton(withTitle: AppConstants.Localizable.quitAll)
         alert.addButton(withTitle: "Cancel")
         alert.alertStyle = .warning
-
         let response = alert.runModal()
         if response == .alertFirstButtonReturn {
             DispatchQueue.main.async { self.processManager.quitAllApps() }
         }
     }
-
-    @objc private func openSettingsAction() {
-        showPopover()
-    }
-
-    // MARK: - Icon visibility
 
     func updateVisibility() {
         applyIconVisibility()
@@ -244,5 +213,19 @@ final class StatusBarController {
     @objc private func handleSettingsChanged() {
         applyIconVisibility()
         updateButtonImage()
+        closePopover()
+    }
+}
+
+extension StatusBarController: NSMenuDelegate {
+    func menuWillOpen(_ menu: NSMenu) {
+        menu.cancelTracking()
+        if popover.isShown {
+            closePopover()
+        } else {
+            DispatchQueue.main.async { [weak self] in
+                self?.showPopover()
+            }
+        }
     }
 }
