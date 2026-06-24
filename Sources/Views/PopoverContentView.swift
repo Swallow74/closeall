@@ -16,6 +16,8 @@ struct PopoverContentView: View {
     @State private var showSettings = false
     @State private var showIgnoredSheet = false
     @State private var expandedGroups: Set<String> = ["General", "Monitors", "Auto-Free"]
+    @State private var expandedApps: Set<String> = []
+    @State private var hoveringPID: Int32? = nil
 
     @AppStorage(AppConstants.UserDefaultsKeys.keyboardShortcuts) private var keyboardShortcutsEnabled = true
     @AppStorage(AppConstants.UserDefaultsKeys.requireConfirmation) private var requireQuitConfirmation = false
@@ -388,7 +390,7 @@ struct PopoverContentView: View {
                             .foregroundColor(.secondary)
                     }
                     .contentShape(Rectangle())
-                    .toolTip(String(
+                    .tooltip(String(
                         format: "GPU: %.0f%%\nGPU utilization",
                         gpuManager.gpuUtilizationPercent
                     ))
@@ -485,7 +487,7 @@ struct PopoverContentView: View {
                 .foregroundColor(.secondary)
         }
         .contentShape(Rectangle())
-        .toolTip(help)
+        .tooltip(help)
     }
 
     private func thermalStateShortLabel(_ state: ProcessInfo.ThermalState) -> String {
@@ -505,36 +507,138 @@ struct PopoverContentView: View {
         return .primary
     }
 
-    // MARK: - App List
+    // MARK: - Combined App & Process List
+
+    private enum CombinedRowType {
+        case app(app: AppInfo, hasChildren: Bool)
+        case child(name: String, memory: UInt64)
+        case orphan(name: String, memory: UInt64)
+        case divider
+    }
+
+    private struct CombinedRow: Identifiable {
+        let id: String
+        let type: CombinedRowType
+        let memory: UInt64
+        let indentLevel: Int
+        let pid: Int32?
+    }
+
+    private var combinedRows: [CombinedRow] {
+        let apps = filteredApps
+        let ownPID = ProcessInfo.processInfo.processIdentifier
+        let ownBundleID = Bundle.main.bundleIdentifier ?? ""
+        var rows: [CombinedRow] = []
+        var usedPIDs = Set<Int32>()
+        var hasOrphans = false
+
+        for app in apps {
+            guard let nsApp = NSWorkspace.shared.runningApplications.first(where: { $0.bundleIdentifier == app.bundleIdentifier })
+            else {
+                rows.append(CombinedRow(id: "app-\(app.id)", type: .app(app: app, hasChildren: false), memory: 0, indentLevel: 0, pid: nil))
+                continue
+            }
+            let appPID = nsApp.processIdentifier
+            usedPIDs.insert(appPID)
+            let appMem = memoryManager.memoryForPID(appPID)
+
+            let children = memoryManager.processParentPID
+                .filter { $0.value == appPID && $0.key > 0 && !usedPIDs.contains($0.key) }
+                .keys
+            let hasChildren = !children.isEmpty
+            rows.append(CombinedRow(id: "app-\(app.id)", type: .app(app: app, hasChildren: hasChildren), memory: appMem, indentLevel: 0, pid: appPID))
+
+            if expandedApps.contains(app.id) {
+                let childRows: [CombinedRow] = children.compactMap { pid in
+                    usedPIDs.insert(pid)
+                    guard let name = memoryManager.processNames[pid], !name.isEmpty,
+                          let mem = memoryManager.processMemoryUsage[pid]
+                    else { return nil }
+                    return CombinedRow(id: "child-\(pid)", type: .child(name: name, memory: mem), memory: mem, indentLevel: 1, pid: pid)
+                }.sorted { $0.memory > $1.memory }
+                rows.append(contentsOf: childRows)
+            } else {
+                children.forEach { usedPIDs.insert($0) }
+            }
+        }
+
+        for (pid, mem) in memoryManager.processMemoryUsage {
+            guard pid > 0, pid != ownPID, !usedPIDs.contains(pid),
+                  mem > 100 * 1_048_576,
+                  !(memoryManager.processIsSystem[pid] ?? false)
+            else { continue }
+            guard let name = memoryManager.processNames[pid], !name.isEmpty
+            else { continue }
+            if !hasOrphans {
+                hasOrphans = true
+                rows.append(CombinedRow(id: "_divider", type: .divider, memory: 0, indentLevel: 0, pid: nil))
+            }
+            rows.append(CombinedRow(id: "orphan-\(pid)", type: .orphan(name: name, memory: mem), memory: mem, indentLevel: 0, pid: pid))
+        }
+
+        return rows
+    }
 
     private var appListView: some View {
         ScrollView {
             LazyVStack(spacing: 2) {
-                ForEach(filteredApps) { app in
-                    AppRowView(
-                        app: app,
-                        isIgnored: processManager.ignoredBundleIdentifiers.contains(app.bundleIdentifier),
-                        isSelected: processManager.selectedAppIds.contains(app.id),
-                        isQuitting: processManager.isQuitting(app.id),
-                        cpuPercent: cpuMonitoringEnabled ? cpuManager.cpuForBundleID(app.bundleIdentifier) : nil,
-                        memoryUsage: memoryPressureMonitoringEnabled ? memoryManager.memoryForBundleID(app.bundleIdentifier) : nil,
-                        isProtected: processManager.isAutoQuitProtected(app.bundleIdentifier),
-                        onQuit: { force in
-                            processManager.quitApp(app, force: force)
-                        },
-                        onToggleIgnore: {
-                            processManager.toggleIgnored(app.bundleIdentifier)
-                        },
-                        onToggleSelect: {
-                            processManager.toggleSelection(app.id)
-                        },
-                        onToggleProtect: {
-                            processManager.toggleAutoQuitProtection(app.bundleIdentifier)
-                        }
-                    )
+                let rows = searchText.isEmpty ? combinedRows : combinedRows.filter {
+                    if case .app(let app, _) = $0.type {
+                        return app.name.localizedCaseInsensitiveContains(searchText)
+                    }
+                    return false
                 }
 
-                if filteredApps.isEmpty && !searchText.isEmpty {
+                ForEach(rows) { row in
+                    switch row.type {
+                    case .app(let app, let hasChildren):
+                        HStack(spacing: 4) {
+                            if hasChildren {
+                                Button(action: {
+                                    if expandedApps.contains(app.id) {
+                                        expandedApps.remove(app.id)
+                                    } else {
+                                        expandedApps.insert(app.id)
+                                    }
+                                }) {
+                                    Image(systemName: expandedApps.contains(app.id) ? "chevron.down" : "chevron.right")
+                                        .font(.system(size: 9))
+                                        .foregroundColor(.secondary)
+                                        .frame(width: 12)
+                                }
+                                .buttonStyle(.plain)
+                            } else {
+                                Spacer().frame(width: 12)
+                            }
+
+                            AppRowView(
+                                app: app,
+                                isIgnored: processManager.ignoredBundleIdentifiers.contains(app.bundleIdentifier),
+                                isSelected: processManager.selectedAppIds.contains(app.id),
+                                isQuitting: processManager.isQuitting(app.id),
+                                cpuPercent: cpuMonitoringEnabled ? cpuManager.cpuForBundleID(app.bundleIdentifier) : nil,
+                                memoryUsage: memoryPressureMonitoringEnabled ? memoryManager.memoryForBundleID(app.bundleIdentifier) : nil,
+                                isProtected: processManager.isAutoQuitProtected(app.bundleIdentifier),
+                                onQuit: { force in processManager.quitApp(app, force: force) },
+                                onToggleIgnore: { processManager.toggleIgnored(app.bundleIdentifier) },
+                                onToggleSelect: { processManager.toggleSelection(app.id) },
+                                onToggleProtect: { processManager.toggleAutoQuitProtection(app.bundleIdentifier) }
+                            )
+                        }
+
+                    case .child(let name, let mem):
+                        procRow(name: name, memory: mem, pid: row.pid, indent: row.indentLevel)
+
+                    case .orphan(let name, let mem):
+                        procRow(name: name, memory: mem, pid: row.pid, indent: row.indentLevel)
+
+                    case .divider:
+                        Divider()
+                            .padding(.vertical, 4)
+                    }
+                }
+
+                if rows.isEmpty && !searchText.isEmpty {
                     VStack(spacing: 8) {
                         Image(systemName: "magnifyingglass")
                             .font(.system(size: 28))
@@ -550,6 +654,67 @@ struct PopoverContentView: View {
             .padding(.vertical, AppConstants.listPaddingV)
         }
         .frame(maxHeight: .infinity)
+    }
+
+    private func procRow(name: String, memory: UInt64, pid: Int32?, indent: Int) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: "gearshape.2")
+                .font(.system(size: 14))
+                .foregroundColor(.secondary)
+                .frame(width: 24)
+
+            Text(name)
+                .font(.system(size: 12))
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            let mb = Double(memory) / 1_048_576
+            let label = mb >= 1024
+                ? String(format: "%.1f GB", mb / 1024)
+                : String(format: "%.0f MB", mb)
+            Text(label)
+                .font(.system(size: 9, weight: .medium))
+                .foregroundColor(.secondary)
+                .padding(.horizontal, 4)
+                .padding(.vertical, 1)
+                .background(Color.secondary.opacity(0.1))
+                .cornerRadius(3)
+
+            if let pid = pid, hoveringPID == pid {
+                HStack(spacing: 4) {
+                    Button(action: { kill(pid, SIGTERM) }) {
+                        Image(systemName: "xmark.circle")
+                            .font(.system(size: 13))
+                            .foregroundColor(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .tooltip("Terminate")
+
+                    Button(action: { kill(pid, SIGKILL) }) {
+                        Image(systemName: "xmark.octagon.fill")
+                            .font(.system(size: 13))
+                            .foregroundColor(.orange)
+                    }
+                    .buttonStyle(.plain)
+                    .tooltip("Force Kill")
+                }
+            }
+        }
+        .padding(.horizontal, AppConstants.rowPaddingH)
+        .padding(.vertical, AppConstants.rowPaddingV)
+        .padding(.leading, CGFloat(indent) * 20)
+        .background(
+            pid != nil && hoveringPID == pid
+                ? Color(NSColor.selectedContentBackgroundColor).opacity(0.3)
+                : Color.clear
+        )
+        .cornerRadius(AppConstants.cornerRadius)
+        .onHover { hovering in
+            if let pid = pid {
+                hoveringPID = hovering ? pid : nil
+            }
+        }
     }
 
     private var filteredApps: [AppInfo] {
@@ -634,7 +799,7 @@ struct PopoverContentView: View {
                         .buttonStyle(BorderedButtonStyle())
                         .tint(.orange)
                         .controlSize(.small)
-                        .help(AppConstants.Localizable.forceQuit)
+                        .tooltip(AppConstants.Localizable.forceQuit)
 
                         Button(action: { showSettings = true }) {
                             Image(systemName: "gearshape.fill")
@@ -644,7 +809,7 @@ struct PopoverContentView: View {
                         .buttonStyle(BorderedButtonStyle())
                         .tint(.gray)
                         .controlSize(.small)
-                        .help(AppConstants.Localizable.settings)
+                        .tooltip(AppConstants.Localizable.settings)
                     }
                 }
 
@@ -741,6 +906,13 @@ extension View {
         self.overlay(
             ToolTipView(tip: tip)
                 .frame(width: 0, height: 0)
+                .allowsHitTesting(false)
+        )
+    }
+
+    func tooltip(_ tip: String) -> some View {
+        self.background(
+            ToolTipView(tip: tip)
                 .allowsHitTesting(false)
         )
     }

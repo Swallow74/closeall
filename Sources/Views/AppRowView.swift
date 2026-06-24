@@ -78,7 +78,7 @@ struct AppRowView: View {
                             .foregroundColor(.blue)
                     }
                     .buttonStyle(.plain)
-                    .help(isProtected ? AppConstants.Localizable.unprotectFromAutoQuit : AppConstants.Localizable.protectFromAutoQuit)
+                    .tooltip(isProtected ? AppConstants.Localizable.unprotectFromAutoQuit : AppConstants.Localizable.protectFromAutoQuit)
 
                     Button(action: onToggleIgnore) {
                         Image(systemName: isIgnored ? "eye.slash.fill" : "eye.fill")
@@ -86,14 +86,14 @@ struct AppRowView: View {
                             .foregroundColor(.secondary)
                     }
                     .buttonStyle(.plain)
-                    .help(isIgnored ? AppConstants.Localizable.unignoreApp : AppConstants.Localizable.ignoreApp)
+                    .tooltip(isIgnored ? AppConstants.Localizable.unignoreApp : AppConstants.Localizable.ignoreApp)
 
                     Button(action: { onQuit(false) }) {
                         Image(systemName: "xmark.circle")
                             .font(.system(size: 14))
                     }
                     .buttonStyle(.plain)
-                    .help(AppConstants.Localizable.quit)
+                    .tooltip(AppConstants.Localizable.quit)
 
                     Button(action: { onQuit(true) }) {
                         Image(systemName: "xmark.octagon.fill")
@@ -101,7 +101,7 @@ struct AppRowView: View {
                             .foregroundColor(.orange)
                     }
                     .buttonStyle(.plain)
-                    .help(AppConstants.Localizable.forceQuit)
+                    .tooltip(AppConstants.Localizable.forceQuit)
                 }
             } else {
                 if isIgnored {

@@ -12,6 +12,10 @@ final class MemoryPressureManager: ObservableObject {
     @Published private(set) var freeMemoryGB: Double = 0.0
     @Published private(set) var totalMemoryGB: Double = 0.0
     @Published private(set) var appMemoryUsage: [String: UInt64] = [:]
+    @Published private(set) var processMemoryUsage: [pid_t: UInt64] = [:]
+    @Published private(set) var processNames: [pid_t: String] = [:]
+    @Published private(set) var processIsSystem: [pid_t: Bool] = [:]
+    @Published private(set) var processParentPID: [pid_t: pid_t] = [:]
 
     var usedMemoryGB: Double {
         totalMemoryGB - freeMemoryGB
@@ -68,13 +72,18 @@ final class MemoryPressureManager: ObservableObject {
 
     private func refresh() {
         let (free, freeGB, totalGB) = freeMemoryInfo()
-        let perApp = collectPerAppMemory()
+        let (perApp, perPID) = collectPerAppMemory()
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
             self.freeMemoryPercentage = free
             self.freeMemoryGB = freeGB
             self.totalMemoryGB = totalGB
             self.appMemoryUsage = perApp
+            self.processMemoryUsage = perPID
+            let (names, system, ppid) = collectAllProcessInfo()
+            self.processNames = names
+            self.processIsSystem = system
+            self.processParentPID = ppid
 
             let threshold = AppSettings.shared.memoryPressureThreshold
             let wasWarning = self.isWarningActive
@@ -126,22 +135,71 @@ final class MemoryPressureManager: ObservableObject {
         return (min(percentage, 1.0), freeGB, totalGB)
     }
 
-    private func collectPerAppMemory() -> [String: UInt64] {
-        var usage: [String: UInt64] = [:]
-        for app in NSWorkspace.shared.runningApplications {
-            guard let bundleID = app.bundleIdentifier else { continue }
+    private func collectPerAppMemory() -> (byBundle: [String: UInt64], byPID: [pid_t: UInt64]) {
+        var byBundle: [String: UInt64] = [:]
+        var byPID: [pid_t: UInt64] = [:]
+        let bufSize = max(Int(proc_listallpids(nil, 0)), 4096)
+        var pidBuffer = [pid_t](repeating: 0, count: bufSize)
+        let count = proc_listallpids(&pidBuffer, Int32(MemoryLayout<pid_t>.size) * Int32(pidBuffer.count))
+        guard count > 0 else { return (byBundle, byPID) }
+        for i in 0..<Int(count) {
+            let pid = pidBuffer[i]
+            guard pid > 0 else { continue }
             var taskInfo = proc_taskinfo()
             let size = MemoryLayout<proc_taskinfo>.size
-            let ret = proc_pidinfo(app.processIdentifier, PROC_PIDTASKINFO, 0, &taskInfo, Int32(size))
-            if ret == size {
-                usage[bundleID] = taskInfo.pti_resident_size
+            if proc_pidinfo(pid, PROC_PIDTASKINFO, 0, &taskInfo, Int32(size)) == size {
+                byPID[pid] = taskInfo.pti_resident_size
             }
         }
-        return usage
+        for app in NSWorkspace.shared.runningApplications {
+            if let bundleID = app.bundleIdentifier, let mem = byPID[app.processIdentifier] {
+                byBundle[bundleID] = mem
+            }
+        }
+        return (byBundle, byPID)
+    }
+
+    private func collectAllProcessInfo() -> (names: [pid_t: String], isSystem: [pid_t: Bool], parentPID: [pid_t: pid_t]) {
+        var names: [pid_t: String] = [:]
+        var isSystem: [pid_t: Bool] = [:]
+        var ppid: [pid_t: pid_t] = [:]
+        let bufSize = max(Int(proc_listallpids(nil, 0)), 4096)
+        var pidBuffer = [pid_t](repeating: 0, count: bufSize)
+        let count = proc_listallpids(&pidBuffer, Int32(MemoryLayout<pid_t>.size) * Int32(pidBuffer.count))
+        guard count > 0 else { return (names, isSystem, ppid) }
+        for i in 0..<Int(count) {
+            let pid = pidBuffer[i]
+            guard pid > 0 else { continue }
+            var pathBuffer = [CChar](repeating: 0, count: 4096)
+            let pathLen = proc_pidpath(pid, &pathBuffer, UInt32(pathBuffer.count))
+            if pathLen > 0 {
+                let path = String(cString: pathBuffer)
+                names[pid] = (path as NSString).lastPathComponent
+                isSystem[pid] = path.hasPrefix("/System/")
+            } else {
+                var nameBuffer = [CChar](repeating: 0, count: 64)
+                proc_name(pid, &nameBuffer, UInt32(nameBuffer.count))
+                let name = String(cString: nameBuffer).trimmingCharacters(in: .whitespaces)
+                if !name.isEmpty {
+                    names[pid] = name
+                }
+                isSystem[pid] = false
+            }
+            var allInfo = proc_taskallinfo()
+            let infoSize = MemoryLayout<proc_taskallinfo>.size
+            if proc_pidinfo(pid, PROC_PIDTASKALLINFO, 0, &allInfo, Int32(infoSize)) == infoSize {
+                ppid[pid] = pid_t(allInfo.pbsd.pbi_ppid)
+            }
+        }
+        return (names, isSystem, ppid)
     }
 
     func memoryForBundleID(_ bundleID: String) -> UInt64 {
         appMemoryUsage[bundleID] ?? 0
+    }
+
+    func memoryForPID(_ pid: pid_t) -> UInt64 {
+        processMemoryUsage[pid] ?? 0
     }
 
     private func postWarningNotification() {

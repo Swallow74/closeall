@@ -60,6 +60,8 @@ The built app will be automatically copied to `/Applications/CloseAll.app`.
 | **GPU Monitor** | GPU utilization % via IOKit AGXAccelerator, custom status bar icon |
 | **Disk Space Monitor** | Free disk space GB/%, warning when below threshold |
 | **Thermal State Monitor** | Tracks system thermal state (fair/serious/critical) |
+| **Process Groups** | Shows child processes under each app with resident memory, expandable/collapsible |
+| **Orphan Processes** | Lists non-system processes > 100 MB not tied to a visible app |
 | **Auto-Free Memory** | When memory critically low, auto-quits background apps to free RAM |
 | **System Tray Icon** | Changes icon/color based on most critical system condition, tooltip shows all states |
 | **No Dock Icon** | Runs silently in the menu bar |
@@ -71,6 +73,7 @@ The built app will be automatically copied to `/Applications/CloseAll.app`.
 - **Right-click icon**: quick actions (Minimize All, Quit All, Settings)
 - **Click checkbox** next to an app: select for batch actions
 - **Hover on an app row**: shows quit and ignore buttons, plus CPU usage if > 5%
+- **Hover on a process row**: shows terminate and force kill buttons with tooltips
 - **Per-app memory**: resident memory shown as `X MB` or `X.X GB` next to each app, apps sorted by memory usage descending
 - **× button**: close the app gently
 - **⚡ button**: force close unresponsive apps
