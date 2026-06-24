@@ -33,6 +33,27 @@
 ## Right-Click Context Menu
 - Status bar button right-click shows: Minimize All / Quit All / Settings (opens popover)
 
+## Release
+1. Bump `MARKETING_VERSION` in `project.yml`
+2. Build: `xcodebuild -project CloseAll.xcodeproj -scheme CloseAll -destination 'platform=macOS,arch=arm64' build`
+3. Create DMG:
+   ```bash
+   APP=~/Library/Developer/Xcode/DerivedData/CloseAll-*/Build/Products/Debug/CloseAll.app
+   TMP=$(mktemp -d)/CloseAll
+   mkdir -p "$TMP"
+   cp -R $APP "$TMP/"
+   ln -s /Applications "$TMP/Applications"
+   hdiutil create -volname "CloseAll" -srcfolder "$TMP" -ov -format UDZO /tmp/CloseAll.dmg
+   ```
+4. Tag and push: `git tag v<version> && git push origin v<version>`
+5. Create release with DMG:
+   ```bash
+   export GH_TOKEN=$(cat ~/.config/opencode/.github-token)
+   gh release create v<version> --title "v<version>: ..." --notes "..."
+   gh release upload v<version> /tmp/CloseAll.dmg --clobber
+   ```
+6. Always include the DMG in the release assets (not just source zip)
+
 ## Quirks
 - `NSStatusBarItem.button` is read-only — cannot replace with custom button subclass; use gesture recognizers or `button.menu` property
 - Minimize uses AppleScript (`tell app "X" to hide`) because `NSRunningApplication.hide()` API is unreliable in modern SDKs
