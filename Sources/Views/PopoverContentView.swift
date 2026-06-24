@@ -172,7 +172,7 @@ struct PopoverContentView: View {
                         .foregroundColor(.primary)
                     Spacer()
                     Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
-                        .font(.system(size: 9))
+                        .font(.system(size: 12, weight: .semibold))
                         .foregroundColor(.secondary)
                 }
                 .contentShape(Rectangle())
@@ -676,13 +676,13 @@ struct PopoverContentView: View {
                                     }
                                 }) {
                                     Image(systemName: expandedApps.contains(app.id) ? "chevron.down" : "chevron.right")
-                                        .font(.system(size: 9))
+                                        .font(.system(size: 12, weight: .semibold))
                                         .foregroundColor(.secondary)
-                                        .frame(width: 12)
+                                        .frame(width: 20)
                                 }
                                 .buttonStyle(.plain)
                             } else {
-                                Spacer().frame(width: 12)
+                                Spacer().frame(width: 20)
                             }
 
                             AppRowView(
