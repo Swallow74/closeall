@@ -55,7 +55,7 @@ The built app will be automatically copied to `/Applications/CloseAll.app`.
 | **Search** | Find running apps by name |
 | **Hide Menu Icon** | Background-only mode, shortcuts still work |
 | **Launch at Login** | Auto-start with your Mac |
-| **Memory Pressure Monitor** | Real-time free RAM %, colored indicator + banner + critical alert |
+| **Memory Pressure Monitor** | Real-time free RAM %, colored indicator + banner + critical alert + per-app resident memory shown in app list sorted by usage |
 | **CPU Monitor** | Global CPU % + per-app CPU usage shown in app list |
 | **GPU Monitor** | GPU utilization % via IOKit AGXAccelerator, custom status bar icon |
 | **Disk Space Monitor** | Free disk space GB/%, warning when below threshold |
@@ -71,6 +71,7 @@ The built app will be automatically copied to `/Applications/CloseAll.app`.
 - **Right-click icon**: quick actions (Minimize All, Quit All, Settings)
 - **Click checkbox** next to an app: select for batch actions
 - **Hover on an app row**: shows quit and ignore buttons, plus CPU usage if > 5%
+- **Per-app memory**: resident memory shown as `X MB` or `X.X GB` next to each app, apps sorted by memory usage descending
 - **× button**: close the app gently
 - **⚡ button**: force close unresponsive apps
 - **⌃⌥⌘Q**: quit all apps instantly

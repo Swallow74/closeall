@@ -11,6 +11,7 @@ final class MemoryPressureManager: ObservableObject {
     @Published private(set) var isCritical = false
     @Published private(set) var freeMemoryGB: Double = 0.0
     @Published private(set) var totalMemoryGB: Double = 0.0
+    @Published private(set) var appMemoryUsage: [String: UInt64] = [:]
 
     var usedMemoryGB: Double {
         totalMemoryGB - freeMemoryGB
@@ -67,11 +68,13 @@ final class MemoryPressureManager: ObservableObject {
 
     private func refresh() {
         let (free, freeGB, totalGB) = freeMemoryInfo()
+        let perApp = collectPerAppMemory()
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
             self.freeMemoryPercentage = free
             self.freeMemoryGB = freeGB
             self.totalMemoryGB = totalGB
+            self.appMemoryUsage = perApp
 
             let threshold = AppSettings.shared.memoryPressureThreshold
             let wasWarning = self.isWarningActive
@@ -123,6 +126,24 @@ final class MemoryPressureManager: ObservableObject {
         return (min(percentage, 1.0), freeGB, totalGB)
     }
 
+    private func collectPerAppMemory() -> [String: UInt64] {
+        var usage: [String: UInt64] = [:]
+        for app in NSWorkspace.shared.runningApplications {
+            guard let bundleID = app.bundleIdentifier else { continue }
+            var taskInfo = proc_taskinfo()
+            let size = MemoryLayout<proc_taskinfo>.size
+            let ret = proc_pidinfo(app.processIdentifier, PROC_PIDTASKINFO, 0, &taskInfo, Int32(size))
+            if ret == size {
+                usage[bundleID] = taskInfo.pti_resident_size
+            }
+        }
+        return usage
+    }
+
+    func memoryForBundleID(_ bundleID: String) -> UInt64 {
+        appMemoryUsage[bundleID] ?? 0
+    }
+
     private func postWarningNotification() {
         let center = UNUserNotificationCenter.current()
         center.requestAuthorization(options: [.alert, .sound]) { granted, _ in
@@ -164,13 +185,13 @@ final class MemoryPressureManager: ObservableObject {
 
             var task: mach_port_name_t = 0
             if task_for_pid(mach_task_self_, app.processIdentifier, &task) == KERN_SUCCESS {
-                var info = task_basic_info_data_t()
+                var info = task_basic_info_64_data_t()
                 var count = mach_msg_type_number_t(
-                    MemoryLayout<task_basic_info_data_t>.size / MemoryLayout<natural_t>.size
+                    MemoryLayout<task_basic_info_64_data_t>.size / MemoryLayout<natural_t>.size
                 )
                 if withUnsafeMutablePointer(to: &info, {
                     $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
-                        task_info(task, task_flavor_t(TASK_BASIC_INFO), $0, &count)
+                        task_info(task, task_flavor_t(TASK_BASIC_INFO_64), $0, &count)
                     }
                 }) == KERN_SUCCESS {
                     freedBytes += UInt64(info.resident_size)

@@ -7,6 +7,7 @@ struct AppRowView: View {
     let isSelected: Bool
     let isQuitting: Bool
     let cpuPercent: Double?
+    let memoryUsage: UInt64?
     let isProtected: Bool
     let onQuit: (Bool) -> Void
     let onToggleIgnore: () -> Void
@@ -46,6 +47,20 @@ struct AppRowView: View {
                     .padding(.horizontal, 4)
                     .padding(.vertical, 1)
                     .background(cpuColor(cpu).opacity(0.1))
+                    .cornerRadius(3)
+            }
+
+            if let mem = memoryUsage, mem > 0 {
+                let mb = Double(mem) / 1_048_576
+                let label = mb >= 1024
+                    ? String(format: "%.1f GB", mb / 1024)
+                    : String(format: "%.0f MB", mb)
+                Text(label)
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundColor(.secondary)
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 1)
+                    .background(Color.secondary.opacity(0.1))
                     .cornerRadius(3)
             }
 

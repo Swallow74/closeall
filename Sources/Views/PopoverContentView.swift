@@ -517,6 +517,7 @@ struct PopoverContentView: View {
                         isSelected: processManager.selectedAppIds.contains(app.id),
                         isQuitting: processManager.isQuitting(app.id),
                         cpuPercent: cpuMonitoringEnabled ? cpuManager.cpuForBundleID(app.bundleIdentifier) : nil,
+                        memoryUsage: memoryPressureMonitoringEnabled ? memoryManager.memoryForBundleID(app.bundleIdentifier) : nil,
                         isProtected: processManager.isAutoQuitProtected(app.bundleIdentifier),
                         onQuit: { force in
                             processManager.quitApp(app, force: force)
@@ -552,13 +553,20 @@ struct PopoverContentView: View {
     }
 
     private var filteredApps: [AppInfo] {
-        if searchText.isEmpty {
-            return processManager.runningApps
-        } else {
-            return processManager.runningApps.filter {
+        let apps = searchText.isEmpty
+            ? processManager.runningApps
+            : processManager.runningApps.filter {
                 $0.name.localizedCaseInsensitiveContains(searchText)
             }
+
+        if memoryPressureMonitoringEnabled {
+            return apps.sorted {
+                let m1 = memoryManager.memoryForBundleID($0.bundleIdentifier)
+                let m2 = memoryManager.memoryForBundleID($1.bundleIdentifier)
+                return m1 > m2
+            }
         }
+        return apps
     }
 
     // MARK: - Footer
