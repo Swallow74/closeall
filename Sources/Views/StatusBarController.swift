@@ -11,8 +11,6 @@ final class StatusBarController {
     private let memoryManager = MemoryPressureManager.shared
     private var memoryCancellable: AnyCancellable?
     private var memoryCriticalCancellable: AnyCancellable?
-    private var blinkTimer: Timer?
-    private var isBlinkVisible = true
 
     init() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -38,13 +36,8 @@ final class StatusBarController {
 
         memoryCriticalCancellable = memoryManager.$isCritical
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] isCritical in
-                if isCritical {
-                    self?.startBlinking()
-                } else {
-                    self?.stopBlinking()
-                    self?.updateButtonImage()
-                }
+            .sink { [weak self] _ in
+                self?.updateButtonImage()
             }
     }
 
@@ -71,46 +64,23 @@ final class StatusBarController {
                 .withSymbolConfiguration(config)!
             image.isTemplate = false
             btn.image = image
+            btn.contentTintColor = .systemRed
             btn.toolTip = String(format: AppConstants.Localizable.memoryPressureBad, pct)
         } else if memoryManager.isWarningActive {
             let symName = "exclamationmark.triangle.fill"
             let image = NSImage(systemSymbolName: symName, accessibilityDescription: "Low memory")!
                 .withSymbolConfiguration(config)!
             image.isTemplate = false
+            btn.contentTintColor = nil
             btn.image = image
             btn.toolTip = String(format: AppConstants.Localizable.memoryPressureBad, pct)
         } else {
             let image = NSImage(systemSymbolName: AppConstants.Localizable.statusBarSymbol, accessibilityDescription: "CloseAll")!
                 .withSymbolConfiguration(config)!
             image.isTemplate = true
+            btn.contentTintColor = nil
             btn.image = image
             btn.toolTip = String(format: AppConstants.Localizable.memoryPressureGood, pct)
-        }
-    }
-
-    private func startBlinking() {
-        blinkTimer?.invalidate()
-        isBlinkVisible = true
-        updateButtonImage()
-        blinkTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
-            self?.toggleBlink()
-        }
-    }
-
-    private func stopBlinking() {
-        blinkTimer?.invalidate()
-        blinkTimer = nil
-        isBlinkVisible = true
-    }
-
-    private func toggleBlink() {
-        isBlinkVisible.toggle()
-        guard let btn = button else { return }
-        if isBlinkVisible {
-            updateButtonImage()
-        } else {
-            btn.image = nil
-            btn.toolTip = "Memory critically low!"
         }
     }
 
@@ -151,7 +121,7 @@ final class StatusBarController {
 
     private func setupPopover() {
         popover.contentSize = NSSize(width: AppConstants.popoverWidth, height: AppConstants.popoverHeight)
-        popover.behavior = .transient
+        popover.behavior = .semitransient
         popover.contentViewController = NSHostingController(
             rootView: PopoverContentView(processManager: processManager, onDismiss: { [weak self] in self?.closePopover() })
         )
@@ -172,8 +142,12 @@ final class StatusBarController {
 
     private func showPopover() {
         guard let btn = button else { return }
-        popover.show(relativeTo: btn.bounds, of: btn, preferredEdge: .minY)
-        processManager.refreshRunningApps()
+        closePopover()
+        DispatchQueue.main.async { [weak self] in
+            guard let self, let btn = self.button else { return }
+            self.popover.show(relativeTo: btn.bounds, of: btn, preferredEdge: .minY)
+            self.processManager.refreshRunningApps()
+        }
     }
 
     private func closePopover() {
