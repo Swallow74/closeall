@@ -16,6 +16,7 @@ struct PopoverContentView: View {
     @State private var quitErrors: [QuitError] = []
     @State private var settingsExpanded = false
     @State private var launchAtLogin: Bool = LoginItemsManager.isRegistered
+    @State private var showIgnoredSheet = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -50,6 +51,80 @@ struct PopoverContentView: View {
         } message: {
             Text(String(format: AppConstants.AlertMessages.forceQuitSelectedMessage, processManager.selectedAppIds.count))
         }
+        .sheet(isPresented: $showIgnoredSheet) {
+            ignoredAppsSheet
+        }
+    }
+
+    private var ignoredAppsSheet: some View {
+        let ignored = processManager.ignoredAppNames()
+        return VStack(spacing: 0) {
+            HStack {
+                Text("Ignored Apps")
+                    .font(.system(size: 13, weight: .semibold))
+                Spacer()
+                Button(action: { showIgnoredSheet = false }) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 16))
+                        .foregroundColor(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding()
+
+            Divider()
+
+            if ignored.isEmpty {
+                VStack(spacing: 8) {
+                    Image(systemName: "eye.slash")
+                        .font(.system(size: 28))
+                        .foregroundColor(.secondary)
+                    Text(AppConstants.Localizable.noIgnoredApps)
+                        .font(.system(size: 12))
+                        .foregroundColor(.secondary)
+                }
+                .frame(maxWidth: .infinity, minHeight: 80)
+            } else {
+                ScrollView {
+                    LazyVStack(spacing: 2) {
+                        ForEach(ignored, id: \.bundleID) { item in
+                            HStack {
+                                if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: item.bundleID) {
+                                    Image(nsImage: NSWorkspace.shared.icon(forFile: url.path))
+                                        .resizable()
+                                        .frame(width: 20, height: 20)
+                                }
+                                Text(item.name)
+                                    .font(.system(size: 12))
+                                    .lineLimit(1)
+                                Spacer()
+                                Button(AppConstants.Localizable.unignore) {
+                                    processManager.removeFromIgnored(item.bundleID)
+                                }
+                                .font(.system(size: 11))
+                                .buttonStyle(.plain)
+                                .foregroundColor(.blue)
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                        }
+                    }
+                    .padding(.vertical, 4)
+                }
+                .frame(minHeight: 100, maxHeight: 250)
+            }
+
+            Divider()
+            HStack {
+                Spacer()
+                Button("Done") { showIgnoredSheet = false }
+                    .font(.system(size: 11))
+                    .keyboardShortcut(.defaultAction)
+            }
+            .padding()
+        }
+        .frame(width: 280, height: ignored.isEmpty ? 160 : 320)
+        .background(Color(NSColor.windowBackgroundColor))
     }
 
     private var anyWarningActive: Bool {
@@ -325,6 +400,17 @@ struct PopoverContentView: View {
                     .onChange(of: launchAtLogin) { newValue in
                         LoginItemsManager.setRegistered(newValue)
                     }
+
+                Button(action: { showIgnoredSheet = true }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "eye.slash.fill")
+                            .font(.system(size: 10))
+                        Text(AppConstants.Localizable.manageIgnored)
+                            .font(.system(size: 10))
+                    }
+                    .foregroundColor(.secondary)
+                }
+                .buttonStyle(.plain)
             }
             .padding(.horizontal, AppConstants.headerPaddingH)
         } label: {

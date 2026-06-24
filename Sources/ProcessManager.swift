@@ -253,6 +253,19 @@ final class ProcessManager: ObservableObject {
     private func saveIgnoredApps() {
         UserDefaults.standard.set(Array(ignoredBundleIdentifiers), forKey: AppConstants.UserDefaultsKeys.ignoredApps)
     }
+
+    func ignoredAppNames() -> [(bundleID: String, name: String)] {
+        ignoredBundleIdentifiers
+            .filter { $0 != AppConstants.BundleIdentifiers.finder }
+            .compactMap { bundleID in
+                if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) {
+                    let name = FileManager.default.displayName(atPath: url.path)
+                    return (bundleID, (name as NSString).deletingPathExtension)
+                }
+                return (bundleID, bundleID)
+            }
+            .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
 }
 
 struct QuitError: Identifiable {
