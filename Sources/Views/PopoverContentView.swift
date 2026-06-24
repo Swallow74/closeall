@@ -8,6 +8,7 @@ struct PopoverContentView: View {
     @ObservedObject private var diskManager = DiskSpaceManager.shared
     @ObservedObject private var cpuManager = CPUManager.shared
     @ObservedObject private var gpuManager = GPUManager.shared
+    @StateObject private var updateChecker = UpdateChecker.shared
     var onDismiss: () -> Void = {}
 
     @State private var searchText = ""
@@ -48,6 +49,9 @@ struct PopoverContentView: View {
         VStack(spacing: 0) {
             if anyWarningActive {
                 warningBanners
+            }
+            if updateChecker.updateAvailable {
+                updateBanner
             }
             headerView
             Divider()
@@ -272,6 +276,33 @@ struct PopoverContentView: View {
     }
 
     @ViewBuilder
+    private var updateBanner: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "arrow.down.circle.fill")
+                .font(.system(size: 12))
+                .foregroundColor(.blue)
+            Text("v\(updateChecker.latestVersion) available")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundColor(.blue)
+            Spacer()
+            Button("Download") {
+                if let url = URL(string: updateChecker.downloadURL) {
+                    NSWorkspace.shared.open(url)
+                }
+            }
+            .buttonStyle(.plain)
+            .font(.system(size: 10, weight: .semibold))
+            .foregroundColor(.white)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 2)
+            .background(Color.blue)
+            .cornerRadius(4)
+        }
+        .padding(.horizontal, AppConstants.headerPaddingH)
+        .padding(.vertical, 6)
+        .background(Color.blue.opacity(0.08))
+    }
+
     private var warningBanners: some View {
         VStack(spacing: 1) {
             if memoryManager.isWarningActive && memoryPressureMonitoringEnabled {
@@ -530,7 +561,7 @@ struct PopoverContentView: View {
         let ownBundleID = Bundle.main.bundleIdentifier ?? ""
         var rows: [CombinedRow] = []
         var usedPIDs = Set<Int32>()
-        var hasOrphans = false
+
 
         for app in apps {
             guard let nsApp = NSWorkspace.shared.runningApplications.first(where: { $0.bundleIdentifier == app.bundleIdentifier })
@@ -551,9 +582,9 @@ struct PopoverContentView: View {
             if expandedApps.contains(app.id) {
                 let childRows: [CombinedRow] = children.compactMap { pid in
                     usedPIDs.insert(pid)
-                    guard let name = memoryManager.processNames[pid], !name.isEmpty,
-                          let mem = memoryManager.processMemoryUsage[pid]
+                    guard let name = memoryManager.processNames[pid], !name.isEmpty
                     else { return nil }
+                    let mem = memoryManager.processMemoryUsage[pid] ?? 0
                     return CombinedRow(id: "child-\(pid)", type: .child(name: name, memory: mem), memory: mem, indentLevel: 1, pid: pid)
                 }.sorted { $0.memory > $1.memory }
                 rows.append(contentsOf: childRows)
@@ -562,18 +593,21 @@ struct PopoverContentView: View {
             }
         }
 
-        for (pid, mem) in memoryManager.processMemoryUsage {
-            guard pid > 0, pid != ownPID, !usedPIDs.contains(pid),
-                  mem > 100 * 1_048_576,
-                  !(memoryManager.processIsSystem[pid] ?? false)
-            else { continue }
-            guard let name = memoryManager.processNames[pid], !name.isEmpty
-            else { continue }
-            if !hasOrphans {
-                hasOrphans = true
-                rows.append(CombinedRow(id: "_divider", type: .divider, memory: 0, indentLevel: 0, pid: nil))
+        let orphans: [CombinedRow] = memoryManager.processMemoryUsage
+            .filter { pid, mem in
+                pid > 0 && pid != ownPID && !usedPIDs.contains(pid)
+                    && mem > 20 * 1_048_576
+                    && !(memoryManager.processIsSystem[pid] ?? false)
+                    && !(memoryManager.processNames[pid]?.isEmpty ?? true)
             }
-            rows.append(CombinedRow(id: "orphan-\(pid)", type: .orphan(name: name, memory: mem), memory: mem, indentLevel: 0, pid: pid))
+            .map { pid, mem in
+                let name = memoryManager.processNames[pid] ?? ""
+                return CombinedRow(id: "orphan-\(pid)", type: .orphan(name: name, memory: mem), memory: mem, indentLevel: 0, pid: pid)
+            }
+            .sorted { $0.memory > $1.memory }
+        if !orphans.isEmpty {
+            rows.append(CombinedRow(id: "_divider", type: .divider, memory: 0, indentLevel: 0, pid: nil))
+            rows.append(contentsOf: orphans)
         }
 
         return rows
@@ -669,10 +703,13 @@ struct PopoverContentView: View {
                 .truncationMode(.tail)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-            let mb = Double(memory) / 1_048_576
-            let label = mb >= 1024
-                ? String(format: "%.1f GB", mb / 1024)
-                : String(format: "%.0f MB", mb)
+            let label: String = {
+                if memory == 0 { return "?" }
+                let mb = Double(memory) / 1_048_576
+                return mb >= 1024
+                    ? String(format: "%.1f GB", mb / 1024)
+                    : String(format: "%.0f MB", mb)
+            }()
             Text(label)
                 .font(.system(size: 9, weight: .medium))
                 .foregroundColor(.secondary)

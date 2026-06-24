@@ -65,6 +65,7 @@ The built app will be automatically copied to `/Applications/CloseAll.app`.
 | **Auto-Free Memory** | When memory critically low, auto-quits background apps to free RAM |
 | **System Tray Icon** | Changes icon/color based on most critical system condition, tooltip shows all states |
 | **No Dock Icon** | Runs silently in the menu bar |
+| **Update Notifications** | Checks GitHub for new releases and shows download banner |
 | **Zero Dependencies** | Pure Swift, no external libraries |
 
 ## Interactions

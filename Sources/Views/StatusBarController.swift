@@ -284,6 +284,7 @@ final class StatusBarController: NSObject {
         if popover.isShown { return }
         statusItem.menu = nil
         popover.show(relativeTo: btn.bounds, of: btn, preferredEdge: .minY)
+        UpdateChecker.shared.checkForUpdates()
 
         if let mainScreen = NSScreen.main,
            let popoverWin = popover.contentViewController?.view.window {

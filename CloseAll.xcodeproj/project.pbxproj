@@ -22,6 +22,7 @@
 		BB1993209C7220E2CF3653CD /* MemoryPressureManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD8B98E7A96AD16EDE454447 /* MemoryPressureManager.swift */; };
 		BCE29B28E8B798BB5A4A30CD /* AppSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37D6E7F0110D205FAE09F67C /* AppSettings.swift */; };
 		C5E43CAB2BA1DC545B8B95E3 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B3D7FF841391C4ACC4775AE /* AppDelegate.swift */; };
+		E7CA4DB9600A706C33CB6684 /* UpdateChecker.swift in Sources */ = {isa = PBXBuildFile; fileRef = E22E04BC4F58C6A9AC721038 /* UpdateChecker.swift */; };
 		F5146F606E30C852F961F9FD /* PopoverContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 556BB0AA07ABC9A57891A5E6 /* PopoverContentView.swift */; };
 /* End PBXBuildFile section */
 
@@ -41,6 +42,7 @@
 		D26181EB1C1BFB6B561E4DF6 /* KeyboardShortcutManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardShortcutManager.swift; sourceTree = "<group>"; };
 		D555BFE805FBC3A0849FDB96 /* AppInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppInfo.swift; sourceTree = "<group>"; };
 		E0915F4A8D096791EEDF472F /* CloseAll.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CloseAll.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		E22E04BC4F58C6A9AC721038 /* UpdateChecker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateChecker.swift; sourceTree = "<group>"; };
 		F802B1485C91D28350B4D889 /* GPUManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GPUManager.swift; sourceTree = "<group>"; };
 		FD8B98E7A96AD16EDE454447 /* MemoryPressureManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryPressureManager.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -95,6 +97,7 @@
 				FD8B98E7A96AD16EDE454447 /* MemoryPressureManager.swift */,
 				8654DC42966399307F48BD10 /* ProcessManager.swift */,
 				56E17FA6F7CBDE272AF5B93F /* ThermalStateManager.swift */,
+				E22E04BC4F58C6A9AC721038 /* UpdateChecker.swift */,
 				404BE211A7071E2940C9CEED /* Models */,
 				E49408C7B1C34D1E8A43D171 /* Views */,
 			);
@@ -193,6 +196,7 @@
 				2BC3F5258A121E615A1B4316 /* ProcessManager.swift in Sources */,
 				61BA8CE5A0CE5D81ABE6403C /* StatusBarController.swift in Sources */,
 				431E9E9A6555CC052C9A9356 /* ThermalStateManager.swift in Sources */,
+				E7CA4DB9600A706C33CB6684 /* UpdateChecker.swift in Sources */,
 				1A8760379925AB4AA948AAD6 /* main.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -253,7 +257,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 12.0;
-				MARKETING_VERSION = 1.9.1;
+				MARKETING_VERSION = 1.10.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = CloseAll;
@@ -339,7 +343,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 12.0;
-				MARKETING_VERSION = 1.9.1;
+				MARKETING_VERSION = 1.10.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;

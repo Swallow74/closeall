@@ -16,6 +16,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         statusBarController = StatusBarController()
         registerShortcuts()
+        UpdateChecker.shared.checkForUpdates()
 
         NotificationCenter.default.addObserver(
             self,

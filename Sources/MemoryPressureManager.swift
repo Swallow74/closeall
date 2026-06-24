@@ -72,7 +72,8 @@ final class MemoryPressureManager: ObservableObject {
 
     private func refresh() {
         let (free, freeGB, totalGB) = freeMemoryInfo()
-        let (perApp, perPID) = collectPerAppMemory()
+        let (names, system, ppid, perPID) = collectAllProcessInfo()
+        let perApp = collectPerAppMemory(perPID)
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
             self.freeMemoryPercentage = free
@@ -80,7 +81,6 @@ final class MemoryPressureManager: ObservableObject {
             self.totalMemoryGB = totalGB
             self.appMemoryUsage = perApp
             self.processMemoryUsage = perPID
-            let (names, system, ppid) = collectAllProcessInfo()
             self.processNames = names
             self.processIsSystem = system
             self.processParentPID = ppid
@@ -135,41 +135,44 @@ final class MemoryPressureManager: ObservableObject {
         return (min(percentage, 1.0), freeGB, totalGB)
     }
 
-    private func collectPerAppMemory() -> (byBundle: [String: UInt64], byPID: [pid_t: UInt64]) {
+    private func collectPerAppMemory(_ perPID: [pid_t: UInt64]) -> [String: UInt64] {
         var byBundle: [String: UInt64] = [:]
-        var byPID: [pid_t: UInt64] = [:]
-        let bufSize = max(Int(proc_listallpids(nil, 0)), 4096)
-        var pidBuffer = [pid_t](repeating: 0, count: bufSize)
-        let count = proc_listallpids(&pidBuffer, Int32(MemoryLayout<pid_t>.size) * Int32(pidBuffer.count))
-        guard count > 0 else { return (byBundle, byPID) }
-        for i in 0..<Int(count) {
-            let pid = pidBuffer[i]
-            guard pid > 0 else { continue }
-            var taskInfo = proc_taskinfo()
-            let size = MemoryLayout<proc_taskinfo>.size
-            if proc_pidinfo(pid, PROC_PIDTASKINFO, 0, &taskInfo, Int32(size)) == size {
-                byPID[pid] = taskInfo.pti_resident_size
-            }
-        }
         for app in NSWorkspace.shared.runningApplications {
-            if let bundleID = app.bundleIdentifier, let mem = byPID[app.processIdentifier] {
+            if let bundleID = app.bundleIdentifier, let mem = perPID[app.processIdentifier] {
                 byBundle[bundleID] = mem
             }
         }
-        return (byBundle, byPID)
+        return byBundle
     }
 
-    private func collectAllProcessInfo() -> (names: [pid_t: String], isSystem: [pid_t: Bool], parentPID: [pid_t: pid_t]) {
+    private func collectAllProcessInfo() -> (names: [pid_t: String], isSystem: [pid_t: Bool], parentPID: [pid_t: pid_t], memory: [pid_t: UInt64]) {
         var names: [pid_t: String] = [:]
         var isSystem: [pid_t: Bool] = [:]
         var ppid: [pid_t: pid_t] = [:]
+        var memory: [pid_t: UInt64] = [:]
         let bufSize = max(Int(proc_listallpids(nil, 0)), 4096)
         var pidBuffer = [pid_t](repeating: 0, count: bufSize)
         let count = proc_listallpids(&pidBuffer, Int32(MemoryLayout<pid_t>.size) * Int32(pidBuffer.count))
-        guard count > 0 else { return (names, isSystem, ppid) }
+        guard count > 0 else { return (names, isSystem, ppid, memory) }
         for i in 0..<Int(count) {
             let pid = pidBuffer[i]
             guard pid > 0 else { continue }
+            var allInfo = proc_taskallinfo()
+            let infoSize = MemoryLayout<proc_taskallinfo>.size
+            guard proc_pidinfo(pid, PROC_PIDTASKALLINFO, 0, &allInfo, Int32(infoSize)) == infoSize
+            else { continue }
+            ppid[pid] = pid_t(allInfo.pbsd.pbi_ppid)
+            memory[pid] = allInfo.ptinfo.pti_resident_size
+
+            let commName = withUnsafePointer(to: allInfo.pbsd.pbi_comm) {
+                $0.withMemoryRebound(to: CChar.self, capacity: MemoryLayout.size(ofValue: allInfo.pbsd.pbi_comm)) {
+                    String(cString: $0)
+                }
+            }.trimmingCharacters(in: .whitespaces)
+            if !commName.isEmpty {
+                names[pid] = commName
+            }
+
             var pathBuffer = [CChar](repeating: 0, count: 4096)
             let pathLen = proc_pidpath(pid, &pathBuffer, UInt32(pathBuffer.count))
             if pathLen > 0 {
@@ -177,21 +180,10 @@ final class MemoryPressureManager: ObservableObject {
                 names[pid] = (path as NSString).lastPathComponent
                 isSystem[pid] = path.hasPrefix("/System/")
             } else {
-                var nameBuffer = [CChar](repeating: 0, count: 64)
-                proc_name(pid, &nameBuffer, UInt32(nameBuffer.count))
-                let name = String(cString: nameBuffer).trimmingCharacters(in: .whitespaces)
-                if !name.isEmpty {
-                    names[pid] = name
-                }
                 isSystem[pid] = false
             }
-            var allInfo = proc_taskallinfo()
-            let infoSize = MemoryLayout<proc_taskallinfo>.size
-            if proc_pidinfo(pid, PROC_PIDTASKALLINFO, 0, &allInfo, Int32(infoSize)) == infoSize {
-                ppid[pid] = pid_t(allInfo.pbsd.pbi_ppid)
-            }
         }
-        return (names, isSystem, ppid)
+        return (names, isSystem, ppid, memory)
     }
 
     func memoryForBundleID(_ bundleID: String) -> UInt64 {
