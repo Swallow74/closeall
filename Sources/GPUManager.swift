@@ -90,9 +90,9 @@ final class GPUManager: ObservableObject {
         center.requestAuthorization(options: [.alert, .sound]) { granted, _ in
             guard granted else { return }
             let content = UNMutableNotificationContent()
-            content.title = "High GPU Usage Warning"
+            content.title = loc("High GPU Usage Warning")
             content.body = String(
-                format: "GPU usage is at %.0f%%",
+                format: loc("GPU usage is at %.0f%%"),
                 self.gpuUtilizationPercent
             )
             content.sound = .default

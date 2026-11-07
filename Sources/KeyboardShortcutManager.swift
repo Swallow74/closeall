@@ -1,48 +1,56 @@
 import Cocoa
+import Carbon.HIToolbox
 
+/// Global hotkeys via Carbon RegisterEventHotKey: no Accessibility permission, no duplicate monitors.
 final class KeyboardShortcutManager {
     static let shared = KeyboardShortcutManager()
 
-    private var handlers: [String: (NSEvent) -> Void] = [:]
-    private var actions: [String: () -> Void] = [:]
+    private var hotKeys: [UInt32: EventHotKeyRef] = [:]
+    private var actions: [UInt32: () -> Void] = [:]
+    private var ids: [String: UInt32] = [:]
+    private var nextID: UInt32 = 1
+    private var handlerInstalled = false
+    private let signature: OSType = 0x434C4F53 // 'CLOS'
 
     private init() {}
 
-    func register(_ name: String, keyCode: UInt16, modifiers: NSEvent.ModifierFlags) {
+    func register(_ name: String, keyCode: UInt32, carbonModifiers: UInt32, action: @escaping () -> Void) {
+        installHandlerIfNeeded()
         unregister(name)
 
-        let handler: (NSEvent) -> Void = { [weak self] event in
-            guard let self = self else { return }
-
-            let effectiveFlags = event.modifierFlags.intersection([.command, .option, .control, .shift])
-            if event.keyCode == keyCode && effectiveFlags == modifiers {
-                if let action = self.actions[name] {
-                    DispatchQueue.main.async { action() }
-                }
-            }
-        }
-
-        handlers[name] = handler
-        NSEvent.addGlobalMonitorForEvents(matching: .keyDown, handler: handler)
+        let id = nextID
+        nextID += 1
+        var ref: EventHotKeyRef?
+        let hotKeyID = EventHotKeyID(signature: signature, id: id)
+        let status = RegisterEventHotKey(keyCode, carbonModifiers, hotKeyID, GetApplicationEventTarget(), 0, &ref)
+        guard status == noErr, let ref else { return }
+        hotKeys[id] = ref
+        actions[id] = action
+        ids[name] = id
     }
 
     func unregister(_ name: String) {
-        if let handler = handlers.removeValue(forKey: name) {
-            NSEvent.removeMonitor(handler)
-        }
+        guard let id = ids.removeValue(forKey: name) else { return }
+        if let ref = hotKeys.removeValue(forKey: id) { UnregisterEventHotKey(ref) }
+        actions.removeValue(forKey: id)
     }
 
     func unregisterAll() {
-        for name in handlers.keys {
-            unregister(name)
-        }
+        for name in Array(ids.keys) { unregister(name) }
     }
 
-    func setAction(_ name: String, action: @escaping () -> Void) {
-        actions[name] = action
-    }
-
-    func disableAll() {
-        unregisterAll()
+    private func installHandlerIfNeeded() {
+        guard !handlerInstalled else { return }
+        handlerInstalled = true
+        var spec = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
+        InstallEventHandler(GetApplicationEventTarget(), { _, event, _ in
+            var hotKeyID = EventHotKeyID()
+            let status = GetEventParameter(event, EventParamName(kEventParamDirectObject), EventParamType(typeEventHotKeyID),
+                                           nil, MemoryLayout<EventHotKeyID>.size, nil, &hotKeyID)
+            if status == noErr, let action = KeyboardShortcutManager.shared.actions[hotKeyID.id] {
+                DispatchQueue.main.async { action() }
+            }
+            return noErr
+        }, 1, &spec, nil, nil)
     }
 }

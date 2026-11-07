@@ -103,9 +103,9 @@ final class DiskSpaceManager: ObservableObject {
         center.requestAuthorization(options: [.alert, .sound]) { granted, _ in
             guard granted else { return }
             let content = UNMutableNotificationContent()
-            content.title = "Low Disk Space Warning"
+            content.title = loc("Low Disk Space Warning")
             content.body = String(
-                format: "Free disk space: %.1f GB (%.0f%% of %.0f GB)",
+                format: loc("Free disk space: %.1f GB (%.0f%% of %.0f GB)"),
                 self.freeGB,
                 self.freePercentage * 100,
                 self.totalGB

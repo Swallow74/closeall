@@ -86,18 +86,30 @@ final class AppSettings: ObservableObject {
             NotificationCenter.default.post(name: .settingsChanged, object: nil)
         }
         .store(in: &cancellables)
+
+        NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.reload() }
+            .store(in: &cancellables)
     }
 
+    /// Pulls values changed outside this object (e.g. @AppStorage, `defaults write`). Assigns only on difference: no feedback loop.
     func reload() {
-        keyboardShortcutsEnabled = UserDefaults.standard.bool(forKey: AppConstants.UserDefaultsKeys.keyboardShortcuts)
-        requireQuitConfirmation = UserDefaults.standard.bool(forKey: AppConstants.UserDefaultsKeys.requireConfirmation)
-        hideMenuBarIcon = UserDefaults.standard.bool(forKey: AppConstants.UserDefaultsKeys.hideMenuBarIcon)
-        memoryPressureMonitoringEnabled = UserDefaults.standard.bool(forKey: AppConstants.UserDefaultsKeys.memoryPressure)
-        thermalStateMonitoringEnabled = UserDefaults.standard.bool(forKey: AppConstants.UserDefaultsKeys.thermalState)
-        diskSpaceMonitoringEnabled = UserDefaults.standard.bool(forKey: AppConstants.UserDefaultsKeys.diskSpace)
-        cpuMonitoringEnabled = UserDefaults.standard.bool(forKey: AppConstants.UserDefaultsKeys.cpuMonitoring)
-        gpuMonitoringEnabled = UserDefaults.standard.bool(forKey: AppConstants.UserDefaultsKeys.gpuMonitoring)
-        autoFreeMemoryEnabled = UserDefaults.standard.bool(forKey: AppConstants.UserDefaultsKeys.autoFreeMemory)
+        let d = UserDefaults.standard
+        func sync(_ keyPath: ReferenceWritableKeyPath<AppSettings, Bool>, _ key: String) {
+            let v = d.bool(forKey: key)
+            if self[keyPath: keyPath] != v { self[keyPath: keyPath] = v }
+        }
+        typealias K = AppConstants.UserDefaultsKeys
+        sync(\.keyboardShortcutsEnabled, K.keyboardShortcuts)
+        sync(\.requireQuitConfirmation, K.requireConfirmation)
+        sync(\.hideMenuBarIcon, K.hideMenuBarIcon)
+        sync(\.memoryPressureMonitoringEnabled, K.memoryPressure)
+        sync(\.thermalStateMonitoringEnabled, K.thermalState)
+        sync(\.diskSpaceMonitoringEnabled, K.diskSpace)
+        sync(\.cpuMonitoringEnabled, K.cpuMonitoring)
+        sync(\.gpuMonitoringEnabled, K.gpuMonitoring)
+        sync(\.autoFreeMemoryEnabled, K.autoFreeMemory)
     }
 }
 

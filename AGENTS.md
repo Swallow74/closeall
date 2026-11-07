@@ -16,7 +16,10 @@
   - `StatusBarController.swift` — status bar button, popover lifecycle, right-click context menu
   - `PopoverContentView.swift` — main UI: app list, settings toggles, footer actions
   - `AppSettings.swift` — UserDefaults-backed settings (keyboard shortcuts, confirmation, hide icon)
-  - `KeyboardShortcutManager.swift` — global hotkeys via `NSEvent.addGlobalMonitorForEvents`
+  - `KeyboardShortcutManager.swift` — global hotkeys via Carbon `RegisterEventHotKey` (no Accessibility permission)
+  - `ProcessScanner.swift` — libproc scan of all processes (resident memory, CPU time, parent); no `task_for_pid`
+  - `LoginItemsManager.swift` — launch at login via `SMAppService` (macOS 13+), fallback opens Login Items pane
+  - `Views/SettingsView.swift`, `Views/Components.swift` — settings page, shared chips/badges/tooltips
   - `AppConstants.swift` — all string keys, dimensions, UserDefaults keys, key combos
 
 ## Settings (UserDefaults)
@@ -28,7 +31,8 @@
 ## Keyboard Shortcuts
 - `^⌥⌘Q` — Quit All Apps (global, registered via NSEvent global monitor)
 - `^⌥⌘M` — Minimize All Apps (global)
-- Handled by `KeyboardShortcutManager` in `AppDelegate`; disabled when settings toggle is off
+- Handled by `KeyboardShortcutManager` in `AppDelegate` (key codes: Q = 0x0C, M = 0x2E); disabled when settings toggle is off
+- Re-launching the app (Spotlight/Finder) opens the popover: way back in when the icon is hidden
 
 ## Right-Click Context Menu
 - Status bar button right-click shows: Minimize All / Quit All / Settings (opens popover)
@@ -54,8 +58,21 @@
    ```
 6. Always include the DMG in the release assets (not just source zip)
 
+## Screenshot (README)
+- File: `screenshot-v3.png` (riferito in README.md come `![CloseAll Screenshot](screenshot-v3.png)`)
+- **Attenzione**: gli screenshot di macOS sono in formato HEIF/HEIC anche se l'estensione è `.png`. Vanno convertiti in vero PNG con `sips -s format png <input> --out <output>` prima di committarli.
+- Se il CDN di GitHub continua a servire la vecchia versione, rinominare il file (es. `screenshot-v3.png`) e aggiornare il README per forzare il refresh.
+
+## Localization
+- Strings: `AppConstants.Localizable` (alias `L`) wraps `loc()` = `NSLocalizedString`; key = English text. Italian in `Resources/it.lproj/Localizable.strings`. New string: add to `Localizable` + the `.strings` file.
+- XcodeGen: `Resources/` must be a `sources` entry with `buildPhase: resources` (a `resources:` key is ignored and ships nothing, not even the icon).
+
 ## Quirks
 - `NSStatusBarItem.button` is read-only — cannot replace with custom button subclass; use gesture recognizers or `button.menu` property
-- Minimize uses AppleScript (`tell app "X" to hide`) because `NSRunningApplication.hide()` API is unreliable in modern SDKs
+- Minimize uses `NSRunningApplication.hide()` (not AppleScript)
+- Quit is non-blocking: `terminate()` on all targets, poll `isTerminated` on main; apps that don't quit within 5s land in `ProcessManager.failedApps` (banner with Force Quit). Never block main with a semaphore: termination notifications arrive on main
+- Settings live in `AppSettings` (observes `UserDefaults.didChangeNotification`); views bind to it, not `@AppStorage`, for monitor toggles
+- Per-process data scans only while the popover is open (`MemoryPressureManager.setDetailedScan`)
+- Verify without touching /Applications: `xcodebuild ... -configuration Release -derivedDataPath <tmp>` (post-build copy runs only for Debug)
 - All LSP "cannot find X" errors are false positives — single target, no modules. Trust `xcodebuild` output only
-- Popover height is 450pt (includes settings section)
+- Popover is 340×540pt

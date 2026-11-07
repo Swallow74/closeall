@@ -5,20 +5,20 @@ struct AppInfo: Identifiable, Hashable {
     let id: String
     let name: String
     let bundleIdentifier: String
+    let pid: pid_t
     let icon: NSImage
     let isActive: Bool
+    let isHidden: Bool
     let bundleURL: URL?
 
     init(from runningApp: NSRunningApplication) {
-        self.id = runningApp.bundleIdentifier ?? UUID().uuidString
+        self.pid = runningApp.processIdentifier
+        self.id = runningApp.bundleIdentifier ?? "pid-\(runningApp.processIdentifier)"
         self.name = runningApp.localizedName ?? "Unknown"
         self.bundleIdentifier = runningApp.bundleIdentifier ?? ""
-
-        let iconPath = runningApp.bundleURL?.path ?? ""
-        self.icon = NSWorkspace.shared.icon(forFile: iconPath)
-        self.icon.size = NSSize(width: 24, height: 24)
-
+        self.icon = runningApp.icon ?? NSWorkspace.shared.icon(forFile: runningApp.bundleURL?.path ?? "")
         self.isActive = runningApp.isActive
+        self.isHidden = runningApp.isHidden
         self.bundleURL = runningApp.bundleURL
     }
 
@@ -27,6 +27,6 @@ struct AppInfo: Identifiable, Hashable {
     }
 
     static func == (lhs: AppInfo, rhs: AppInfo) -> Bool {
-        lhs.id == rhs.id
+        lhs.id == rhs.id && lhs.pid == rhs.pid
     }
 }

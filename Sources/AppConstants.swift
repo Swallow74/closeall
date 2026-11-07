@@ -1,8 +1,14 @@
 import SwiftUI
 
+func loc(_ key: String) -> String {
+    NSLocalizedString(key, comment: "")
+}
+
+typealias L = AppConstants.Localizable
+
 enum AppConstants {
-    static let popoverWidth: CGFloat     = 320
-    static let popoverHeight: CGFloat    = 500
+    static let popoverWidth: CGFloat     = 340
+    static let popoverHeight: CGFloat    = 540
     static let headerPaddingH: CGFloat   = 16
     static let headerPaddingV: CGFloat   = 12
     static let footerPaddingH: CGFloat   = 16
@@ -15,6 +21,7 @@ enum AppConstants {
     static let cornerRadius: CGFloat     = 6
     static let quitRefreshDelay: Double   = 0.5
     static let batchQuitRefreshDelay: Double = 1.5
+    static let quitTimeout: TimeInterval = 5
 
     enum UserDefaultsKeys {
         static let ignoredApps           = "CloseAllIgnoredApps"
@@ -37,71 +44,100 @@ enum AppConstants {
         static let finder = "com.apple.finder"
     }
 
-    enum AlertMessages {
-        static let quitSelectedTitle       = "Quit Selected Apps"
-        static let quitSelectedMessage     = "Are you sure you want to quit %d selected apps?"
-        static let forceQuitSelectedTitle  = "Force Quit Selected Apps"
-        static let forceQuitSelectedMessage = "Force quit %d apps? Data may be lost."
-        static let quitAllTitle            = "Quit All Apps"
-        static let quitAllMessage          = "Are you sure you want to quit all %d running apps?"
-    }
-
     enum Localizable {
-        static let appName                = "CloseAll"
+        static let appName                = loc("CloseAll")
         static let statusBarSymbol        = "power.circle.fill"
-        static let appsLabel              = "apps"
-        static let selectedLabel          = "selected"
-        static let selectAll              = "Select All"
-        static let deselectAll            = "Deselect All"
-        static let quitSelected           = "Quit Selected"
-        static let force                  = "Force"
-        static let searchPlaceholder      = "Search apps & processes"
-        static let launchAtLogin          = "Launch at login"
-        static let quitCloseAll           = "Quit CloseAll"
-        static let ignoreApp              = "Ignore app"
-        static let unignoreApp            = "Unignore app"
-        static let quit                   = "Quit"
-        static let forceQuit              = "Force Quit"
-        static let quitAll                = "Quit All Apps"
-        static let minimizeAll            = "Minimize All Apps"
-        static let settings               = "Settings"
-        static let keyboardShortcuts      = "Keyboard shortcuts"
-        static let requireConfirmation    = "Require confirmation for Quit All"
-        static let hideIcon               = "Hide menu bar icon"
-        static let memoryWarning          = "Memory Warning"
-        static let memoryWarningMessage   = "Free memory: %.0f%% (%.1f GB / %.1f GB)"
-        static let memoryMonitoring       = "Memory pressure monitoring"
-        static let memoryPressureGood     = "Memory: %.0f%% free"
-        static let memoryPressureBad      = "⚠ Memory: %.0f%% free"
-        static let manageIgnored          = "Manage ignored apps..."
-        static let noIgnoredApps          = "No ignored apps"
-        static let unignore               = "Unignore"
-        static let thermalMonitoring       = "Thermal state monitoring"
-        static let diskMonitoring          = "Disk space monitoring"
-        static let cpuMonitoring           = "CPU monitoring"
-        static let autoFreeMemory          = "Auto-free memory when low"
-        static let diskWarningMessage      = "Low disk space: %.1f GB (%.0f%% of %.0f GB)"
-        static let thermalWarningMessage   = "System thermal state: %@"
-        static let cpuWarningMessage       = "High CPU usage: %.0f%%"
-        static let thermalStateNominal     = "Normal"
-        static let thermalStateFair        = "Fair"
-        static let thermalStateSerious     = "Serious"
-        static let thermalStateCritical    = "Critical"
-        static let diskPressureGood        = "Disk: %.0f%% free"
-        static let diskPressureBad         = "⚠ Disk: %.0f%% free"
-        static let thermalGood             = "Thermal: %@"
-        static let thermalBad              = "⚠ Thermal: %@"
-        static let cpuPressureGood         = "CPU: %.0f%%"
-        static let cpuPressureBad         = "⚠ CPU: %.0f%%"
-        static let gpuPressureGood         = "GPU: %.0f%%"
-        static let gpuPressureBad         = "⚠ GPU: %.0f%%"
-        static let gpuMonitoring           = "GPU monitoring"
-        static let gpuWarningMessage       = "High GPU usage: %.0f%%"
-        static let protectFromAutoQuit    = "Protect from auto-quit"
-        static let unprotectFromAutoQuit  = "Remove protection"
-        static let settingsGeneral        = "General"
-        static let settingsMonitors       = "Monitors"
-        static let settingsAutoFree       = "Auto-Free"
+        static let appsLabel              = loc("apps")
+        static let selectedLabel          = loc("selected")
+        static let selectAll              = loc("Select All")
+        static let deselectAll            = loc("Deselect All")
+        static let quitSelected           = loc("Quit Selected")
+        static let force                  = loc("Force")
+        static let searchPlaceholder      = loc("Search apps & processes")
+        static let launchAtLogin          = loc("Launch at login")
+        static let quitCloseAll           = loc("Quit CloseAll")
+        static let ignoreApp              = loc("Ignore app")
+        static let unignoreApp            = loc("Unignore app")
+        static let quit                   = loc("Quit")
+        static let forceQuit              = loc("Force Quit")
+        static let quitAll                = loc("Quit All Apps")
+        static let minimizeAll            = loc("Minimize All Apps")
+        static let settings               = loc("Settings")
+        static let keyboardShortcuts      = loc("Keyboard shortcuts")
+        static let requireConfirmation    = loc("Require confirmation for Quit All")
+        static let hideIcon               = loc("Hide menu bar icon")
+        static let memoryWarning          = loc("Memory Warning")
+        static let memoryWarningMessage   = loc("Free memory: %.0f%% (%.1f GB / %.1f GB)")
+        static let memoryMonitoring       = loc("Memory pressure monitoring")
+        static let memoryPressureGood     = loc("Memory: %.0f%% free")
+        static let memoryPressureBad      = loc("⚠ Memory: %.0f%% free")
+        static let manageIgnored          = loc("Manage ignored apps...")
+        static let noIgnoredApps          = loc("No ignored apps")
+        static let unignore               = loc("Unignore")
+        static let thermalMonitoring       = loc("Thermal state monitoring")
+        static let diskMonitoring          = loc("Disk space monitoring")
+        static let cpuMonitoring           = loc("CPU monitoring")
+        static let autoFreeMemory          = loc("Auto-free memory when low")
+        static let diskWarningMessage      = loc("Low disk space: %.1f GB (%.0f%% of %.0f GB)")
+        static let thermalWarningMessage   = loc("System thermal state: %@")
+        static let cpuWarningMessage       = loc("High CPU usage: %.0f%%")
+        static let thermalStateNominal     = loc("Normal")
+        static let thermalStateFair        = loc("Fair")
+        static let thermalStateSerious     = loc("Serious")
+        static let thermalStateCritical    = loc("Critical")
+        static let diskPressureGood        = loc("Disk: %.0f%% free")
+        static let diskPressureBad         = loc("⚠ Disk: %.0f%% free")
+        static let thermalGood             = loc("Thermal: %@")
+        static let thermalBad              = loc("⚠ Thermal: %@")
+        static let cpuPressureGood         = loc("CPU: %.0f%%")
+        static let cpuPressureBad         = loc("⚠ CPU: %.0f%%")
+        static let gpuPressureGood         = loc("GPU: %.0f%%")
+        static let gpuPressureBad         = loc("⚠ GPU: %.0f%%")
+        static let gpuMonitoring           = loc("GPU monitoring")
+        static let gpuWarningMessage       = loc("High GPU usage: %.0f%%")
+        static let protectFromAutoQuit    = loc("Protect from auto-quit")
+        static let unprotectFromAutoQuit  = loc("Remove protection")
+        static let settingsGeneral        = loc("General")
+        static let settingsMonitors       = loc("Monitors")
+        static let settingsAutoFree       = loc("Auto-Free")
+        static let cancel                 = loc("Cancel")
+        static let back                   = loc("Back")
+        static let quitAllMessage         = loc("Quit all %d running apps?")
+        static let quitSelectedTitle      = loc("Quit Selected Apps")
+        static let quitSelectedMessage    = loc("Quit %d selected apps?")
+        static let forceQuitSelectedTitle = loc("Force Quit Selected Apps")
+        static let forceQuitSelectedMessage = loc("Force quit %d apps? Unsaved data may be lost.")
+        static let forceQuitFailedMessage = loc("Force quit: %@? Unsaved data may be lost.")
+        static let failedToQuit           = loc("%d app(s) didn't quit")
+        static let dismiss                = loc("Dismiss")
+        static let updateAvailable        = loc("v%@ available")
+        static let installing             = loc("Installing…")
+        static let installAndRestart      = loc("Install & Restart")
+        static let download               = loc("Download")
+        static let clearSearch            = loc("Clear search")
+        static let backgroundProcesses    = loc("Background processes")
+        static let nothingToQuit          = loc("Nothing to quit")
+        static let noMatch                = loc("No apps matching \"%@\"")
+        static let quitting               = loc("Quitting…")
+        static let protectedLabel         = loc("Protected from auto-quit")
+        static let ignoredLabel           = loc("Ignored")
+        static let moreActions            = loc("More actions")
+        static let showApp                = loc("Show")
+        static let hide                   = loc("Hide")
+        static let unhide                 = loc("Unhide")
+        static let revealInFinder         = loc("Show in Finder")
+        static let expandProcesses        = loc("Show processes")
+        static let collapseProcesses      = loc("Hide processes")
+        static let terminate              = loc("Terminate")
+        static let forceKill              = loc("Force Kill")
+        static let memoryDetail           = loc("Memory: %.0f%% free\n%.1f GB free of %.1f GB — used %.1f GB")
+        static let diskDetail             = loc("Disk: %.1f GB free of %.1f GB")
+        static let hideIconHint           = loc("Reopen CloseAll from Spotlight or Finder to show it again")
+        static let memoryThreshold        = loc("Warn when free memory is")
+        static let diskThreshold          = loc("Warn when free space is")
+        static let autoFreeHint           = loc("Quits background apps on low memory (not protected ones)")
+        static let about                  = loc("About")
+        static let checkForUpdates        = loc("Check for updates")
     }
 
     static let memoryPressureCheckInterval: TimeInterval = 5.0
@@ -110,27 +146,4 @@ enum AppConstants {
     static let defaultDiskSpaceThreshold: Double = 10.0
     static let cpuCheckInterval: TimeInterval = 3.0
     static let gpuCheckInterval: TimeInterval = 3.0
-
-    struct Shortcuts {
-        static let quitAll = KeyCombo(key: 0x0A, modifierFlags: [.control, .option, .command])
-        static let minimizeAll = KeyCombo(key: 0x3E, modifierFlags: [.control, .option, .command])
-    }
-
-    struct KeyCombo {
-        let key: UInt32
-        let modifierFlags: NSEvent.ModifierFlags
-
-        var carbonFlags: UInt32 {
-            var flags: UInt32 = 0
-            if modifierFlags.contains(.command) { flags |= 0x00000080 }
-            if modifierFlags.contains(.option) { flags |= 0x00000010 }
-            if modifierFlags.contains(.control) { flags |= 0x00000004 }
-            if modifierFlags.contains(.shift) { flags |= 0x00000020 }
-            return flags
-        }
-
-        static func == (lhs: KeyCombo, rhs: KeyCombo) -> Bool {
-            lhs.key == rhs.key && lhs.modifierFlags == rhs.modifierFlags
-        }
-    }
 }

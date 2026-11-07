@@ -10,6 +10,7 @@ final class ProcessManager: ObservableObject {
     @Published var ignoredBundleIdentifiers: Set<String> = []
     @Published var autoQuitProtectedBundleIdentifiers: Set<String> = []
     @Published var selectedAppIds: Set<String> = []
+    @Published private(set) var failedApps: [AppInfo] = []
 
     private var workspaceObservers: [NSObjectProtocol] = []
     private var refreshWorkItem: DispatchWorkItem?
@@ -82,7 +83,9 @@ final class ProcessManager: ObservableObject {
             runningApps.contains { $0.id == id }
         }
 
-        quittingAppIds.removeAll()
+        let liveIDs = Set(runningApps.map { $0.id })
+        quittingAppIds = quittingAppIds.intersection(liveIDs)
+        failedApps = failedApps.filter { f in runningApps.contains { $0.id == f.id && $0.pid == f.pid } }
     }
 
     var selectedApps: [AppInfo] {
@@ -109,96 +112,75 @@ final class ProcessManager: ObservableObject {
         selectedAppIds.removeAll()
     }
 
-    @discardableResult
-    func quitSelectedApps(force: Bool = false) -> [QuitError] {
-        var errors: [QuitError] = []
+    // MARK: - Quit
 
-        for appInfo in selectedApps {
-            if let error = quitApp(appInfo, force: force) {
-                errors.append(error)
-            }
-        }
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + AppConstants.batchQuitRefreshDelay) { [weak self] in
-            self?.refreshRunningApps()
-        }
-
-        return errors
+    func quitSelectedApps(force: Bool = false) {
+        quit(selectedApps, force: force)
     }
 
-    @discardableResult
-    func quitApp(_ appInfo: AppInfo, force: Bool = false) -> QuitError? {
-        guard let app = NSWorkspace.shared.runningApplications.first(where: {
-            $0.bundleIdentifier == appInfo.bundleIdentifier && $0.responds(to: #selector(NSRunningApplication.terminate))
-        }) else { return nil }
-
- quittingAppIds.insert(appInfo.id)
-
-        var quitSucceeded = false
-        let expectation = DispatchSemaphore(value: 0)
-
-        let observer = NotificationCenter.default.addObserver(
-            forName: NSWorkspace.didTerminateApplicationNotification,
-            object: nil,
-            queue: .main
-        ) { notification in
-            if let terminated = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
-               terminated.processIdentifier == app.processIdentifier {
-                quitSucceeded = true
-                expectation.signal()
-            }
-        }
-
-        if force {
-            app.forceTerminate()
-        } else {
-            app.terminate()
-        }
-
-        let timeout = expectation.wait(timeout: .now() + 2.0)
-        NotificationCenter.default.removeObserver(observer)
-
-        quittingAppIds.remove(appInfo.id)
-
-        if timeout == .timedOut && !quitSucceeded {
-            return QuitError(appName: appInfo.name, wasForce: force)
-        }
-
-        return nil
+    func quitApp(_ appInfo: AppInfo, force: Bool = false) {
+        quit([appInfo], force: force)
     }
 
-    func quitAllApps() -> [QuitError] {
-        var errors: [QuitError] = []
-        let snapshot = runningApps
-
-        for appInfo in snapshot {
-            if let error = quitApp(appInfo, force: false) {
-                errors.append(error)
-            }
-        }
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + AppConstants.batchQuitRefreshDelay) { [weak self] in
-            self?.refreshRunningApps()
-        }
-
-        return errors
+    func quitAllApps(force: Bool = false) {
+        quit(runningApps, force: force)
     }
 
-    func forceQuitAllApps() -> [QuitError] {
-        var errors: [QuitError] = []
-        let snapshot = runningApps
+    func retryFailedWithForce() {
+        let apps = failedApps
+        failedApps = []
+        quit(apps, force: true)
+    }
 
-        for appInfo in snapshot {
-            if let error = quitApp(appInfo, force: true) {
-                errors.append(error)
+    func dismissFailures() {
+        failedApps = []
+    }
+
+    /// Non-blocking: asks all apps to quit at once, then polls until they are gone or time runs out.
+    private func quit(_ infos: [AppInfo], force: Bool) {
+        let targets: [(AppInfo, NSRunningApplication)] = infos.compactMap { info in
+            guard let app = NSRunningApplication(processIdentifier: info.pid), !app.isTerminated else { return nil }
+            return (info, app)
+        }
+        guard !targets.isEmpty else { return }
+
+        failedApps.removeAll { f in targets.contains { $0.0.id == f.id } }
+        for (info, app) in targets {
+            quittingAppIds.insert(info.id)
+            if force { app.forceTerminate() } else { app.terminate() }
+        }
+
+        let deadline = Date().addingTimeInterval(force ? 3 : AppConstants.quitTimeout)
+        func poll() {
+            let pending = targets.filter { !$0.1.isTerminated }
+            if pending.isEmpty || Date() >= deadline {
+                for (info, _) in targets { quittingAppIds.remove(info.id) }
+                for (info, _) in pending where !failedApps.contains(where: { $0.id == info.id }) {
+                    failedApps.append(info)
+                }
+                refreshRunningApps()
+                return
             }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25, execute: poll)
         }
+        poll()
+    }
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + AppConstants.batchQuitRefreshDelay) { [weak self] in
-            self?.refreshRunningApps()
-        }
+    // MARK: - Per-app actions
 
-        return errors
+    func activate(_ appInfo: AppInfo) {
+        NSRunningApplication(processIdentifier: appInfo.pid)?.activate(options: [.activateIgnoringOtherApps])
+    }
+
+    func toggleHidden(_ appInfo: AppInfo) {
+        guard let app = NSRunningApplication(processIdentifier: appInfo.pid) else { return }
+        if app.isHidden { app.unhide() } else { app.hide() }
+        refreshRunningApps()
+    }
+
+    func revealInFinder(_ appInfo: AppInfo) {
+        guard let url = appInfo.bundleURL else { return }
+        NSWorkspace.shared.activateFileViewerSelecting([url])
     }
 
     func minimizeAllApps() {
@@ -213,11 +195,7 @@ final class ProcessManager: ObservableObject {
 
     func minimizeSelectedApps() {
         for appInfo in selectedApps {
-            if let app = NSWorkspace.shared.runningApplications.first(where: {
-                $0.bundleIdentifier == appInfo.bundleIdentifier
-            }) {
-                app.hide()
-            }
+            NSRunningApplication(processIdentifier: appInfo.pid)?.hide()
         }
     }
 
@@ -290,19 +268,5 @@ final class ProcessManager: ObservableObject {
                 return (bundleID, bundleID)
             }
             .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
-    }
-}
-
-struct QuitError: Identifiable {
-    let id = UUID()
-    let appName: String
-    let wasForce: Bool
-
-    var message: String {
-        if wasForce {
-            return "Failed to force quit \(appName)"
-        } else {
-            return "Failed to quit \(appName) — try force quit"
-        }
     }
 }

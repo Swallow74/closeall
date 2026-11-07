@@ -81,9 +81,9 @@ final class ThermalStateManager: ObservableObject {
         center.requestAuthorization(options: [.alert, .sound]) { granted, _ in
             guard granted else { return }
             let content = UNMutableNotificationContent()
-            content.title = "Thermal Warning"
+            content.title = loc("Thermal Warning")
             content.body = String(
-                format: "System thermal state is %@",
+                format: loc("System thermal state is %@"),
                 self.localizedState
             )
             content.sound = .default

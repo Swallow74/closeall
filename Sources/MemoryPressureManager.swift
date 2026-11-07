@@ -24,6 +24,7 @@ final class MemoryPressureManager: ObservableObject {
     private var timer: Timer?
     private var hasPostedWarning = false
     private var hasAutoFreed = false
+    private var detailedScan = false
     private var cancellables = Set<AnyCancellable>()
 
     private init() {
@@ -66,44 +67,78 @@ final class MemoryPressureManager: ObservableObject {
         DispatchQueue.main.async {
             self.freeMemoryPercentage = 1.0
             self.isWarningActive = false
+            self.isCritical = false
             self.hasPostedWarning = false
         }
     }
 
+    private let queue = DispatchQueue(label: "closeall.memory", qos: .utility)
+
+    /// Per-process data (names, memory, parents) is only scanned while the popover is open.
+    func setDetailedScan(_ enabled: Bool) {
+        detailedScan = enabled && AppSettings.shared.memoryPressureMonitoringEnabled
+        if detailedScan { refresh() }
+    }
+
     private func refresh() {
-        let (free, freeGB, totalGB) = freeMemoryInfo()
-        let (names, system, ppid, perPID) = collectAllProcessInfo()
-        let perApp = collectPerAppMemory(perPID)
-        DispatchQueue.main.async { [weak self] in
+        let detailed = detailedScan
+        var bundleByPID: [pid_t: String] = [:]
+        if detailed {
+            for app in NSWorkspace.shared.runningApplications {
+                if let id = app.bundleIdentifier { bundleByPID[app.processIdentifier] = id }
+            }
+        }
+        queue.async { [weak self] in
             guard let self = self else { return }
-            self.freeMemoryPercentage = free
-            self.freeMemoryGB = freeGB
-            self.totalMemoryGB = totalGB
-            self.appMemoryUsage = perApp
-            self.processMemoryUsage = perPID
-            self.processNames = names
-            self.processIsSystem = system
-            self.processParentPID = ppid
-
-            let threshold = AppSettings.shared.memoryPressureThreshold
-            let wasWarning = self.isWarningActive
-            let wasCritical = self.isCritical
-            self.isWarningActive = free < threshold
-            self.isCritical = free < 0.1
-
-            if self.isWarningActive && !wasWarning && !self.hasPostedWarning {
-                self.hasPostedWarning = true
-                self.postWarningNotification()
-                if AppSettings.shared.autoFreeMemoryEnabled && !self.hasAutoFreed {
-                    self.hasAutoFreed = true
-                    self.performAutoFree()
+            let (free, freeGB, totalGB) = self.freeMemoryInfo()
+            var names: [pid_t: String] = [:]
+            var system: [pid_t: Bool] = [:]
+            var ppid: [pid_t: pid_t] = [:]
+            var perPID: [pid_t: UInt64] = [:]
+            var perApp: [String: UInt64] = [:]
+            if detailed {
+                for s in ProcessScanner.scan(withNames: true) {
+                    if !s.name.isEmpty { names[s.pid] = s.name }
+                    system[s.pid] = s.isSystem
+                    ppid[s.pid] = s.ppid
+                    perPID[s.pid] = s.resident
                 }
+                for (pid, id) in bundleByPID { if let m = perPID[pid] { perApp[id] = m } }
             }
+            DispatchQueue.main.async {
+                if detailed {
+                    self.appMemoryUsage = perApp
+                    self.processMemoryUsage = perPID
+                    self.processNames = names
+                    self.processIsSystem = system
+                    self.processParentPID = ppid
+                }
+                self.publish(free: free, freeGB: freeGB, totalGB: totalGB)
+            }
+        }
+    }
 
-            if !self.isWarningActive {
-                self.hasPostedWarning = false
-                self.hasAutoFreed = false
+    private func publish(free: Double, freeGB: Double, totalGB: Double) {
+        freeMemoryPercentage = free
+        freeMemoryGB = freeGB
+        totalMemoryGB = totalGB
+
+        let threshold = AppSettings.shared.memoryPressureThreshold
+        let wasWarning = isWarningActive
+        isWarningActive = free < threshold
+        isCritical = free < 0.1
+
+        if isWarningActive && !wasWarning && !hasPostedWarning {
+            hasPostedWarning = true
+            postWarningNotification()
+            if AppSettings.shared.autoFreeMemoryEnabled && !hasAutoFreed {
+                hasAutoFreed = true
+                performAutoFree()
             }
+        }
+        if !isWarningActive {
+            hasPostedWarning = false
+            hasAutoFreed = false
         }
     }
 
@@ -135,57 +170,6 @@ final class MemoryPressureManager: ObservableObject {
         return (min(percentage, 1.0), freeGB, totalGB)
     }
 
-    private func collectPerAppMemory(_ perPID: [pid_t: UInt64]) -> [String: UInt64] {
-        var byBundle: [String: UInt64] = [:]
-        for app in NSWorkspace.shared.runningApplications {
-            if let bundleID = app.bundleIdentifier, let mem = perPID[app.processIdentifier] {
-                byBundle[bundleID] = mem
-            }
-        }
-        return byBundle
-    }
-
-    private func collectAllProcessInfo() -> (names: [pid_t: String], isSystem: [pid_t: Bool], parentPID: [pid_t: pid_t], memory: [pid_t: UInt64]) {
-        var names: [pid_t: String] = [:]
-        var isSystem: [pid_t: Bool] = [:]
-        var ppid: [pid_t: pid_t] = [:]
-        var memory: [pid_t: UInt64] = [:]
-        let bufSize = max(Int(proc_listallpids(nil, 0)), 4096)
-        var pidBuffer = [pid_t](repeating: 0, count: bufSize)
-        let count = proc_listallpids(&pidBuffer, Int32(MemoryLayout<pid_t>.size) * Int32(pidBuffer.count))
-        guard count > 0 else { return (names, isSystem, ppid, memory) }
-        for i in 0..<Int(count) {
-            let pid = pidBuffer[i]
-            guard pid > 0 else { continue }
-            var allInfo = proc_taskallinfo()
-            let infoSize = MemoryLayout<proc_taskallinfo>.size
-            guard proc_pidinfo(pid, PROC_PIDTASKALLINFO, 0, &allInfo, Int32(infoSize)) == infoSize
-            else { continue }
-            ppid[pid] = pid_t(allInfo.pbsd.pbi_ppid)
-            memory[pid] = allInfo.ptinfo.pti_resident_size
-
-            let commName = withUnsafePointer(to: allInfo.pbsd.pbi_comm) {
-                $0.withMemoryRebound(to: CChar.self, capacity: MemoryLayout.size(ofValue: allInfo.pbsd.pbi_comm)) {
-                    String(cString: $0)
-                }
-            }.trimmingCharacters(in: .whitespaces)
-            if !commName.isEmpty {
-                names[pid] = commName
-            }
-
-            var pathBuffer = [CChar](repeating: 0, count: 4096)
-            let pathLen = proc_pidpath(pid, &pathBuffer, UInt32(pathBuffer.count))
-            if pathLen > 0 {
-                let path = String(cString: pathBuffer)
-                names[pid] = (path as NSString).lastPathComponent
-                isSystem[pid] = path.hasPrefix("/System/")
-            } else {
-                isSystem[pid] = false
-            }
-        }
-        return (names, isSystem, ppid, memory)
-    }
-
     func memoryForBundleID(_ bundleID: String) -> UInt64 {
         appMemoryUsage[bundleID] ?? 0
     }
@@ -199,9 +183,9 @@ final class MemoryPressureManager: ObservableObject {
         center.requestAuthorization(options: [.alert, .sound]) { granted, _ in
             guard granted else { return }
             let content = UNMutableNotificationContent()
-            content.title = "Low Memory Warning"
+            content.title = loc("Low Memory Warning")
             content.body = String(
-                format: "Free memory is at %.0f%% (%.1f GB / %.1f GB)",
+                format: loc("Free memory is at %.0f%% (%.1f GB / %.1f GB)"),
                 self.freeMemoryPercentage * 100,
                 self.freeMemoryGB,
                 self.totalMemoryGB
@@ -233,21 +217,7 @@ final class MemoryPressureManager: ObservableObject {
                   !pm.autoQuitProtectedBundleIdentifiers.contains(bundleID)
             else { continue }
 
-            var task: mach_port_name_t = 0
-            if task_for_pid(mach_task_self_, app.processIdentifier, &task) == KERN_SUCCESS {
-                var info = task_basic_info_64_data_t()
-                var count = mach_msg_type_number_t(
-                    MemoryLayout<task_basic_info_64_data_t>.size / MemoryLayout<natural_t>.size
-                )
-                if withUnsafeMutablePointer(to: &info, {
-                    $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
-                        task_info(task, task_flavor_t(TASK_BASIC_INFO_64), $0, &count)
-                    }
-                }) == KERN_SUCCESS {
-                    freedBytes += UInt64(info.resident_size)
-                }
-                mach_port_deallocate(mach_task_self_, task)
-            }
+            freedBytes += ProcessScanner.residentSize(of: app.processIdentifier)
 
             app.terminate()
             freedCount += 1
@@ -264,9 +234,9 @@ final class MemoryPressureManager: ObservableObject {
         center.requestAuthorization(options: [.alert, .sound]) { granted, _ in
             guard granted else { return }
             let content = UNMutableNotificationContent()
-            content.title = "Memory Auto-Freed"
+            content.title = loc("Memory Auto-Freed")
             content.body = String(
-                format: "Quit %d app(s), freed %.0f MB of memory",
+                format: loc("Quit %d app(s), freed %.0f MB of memory"),
                 count, freedMB
             )
             content.sound = .default

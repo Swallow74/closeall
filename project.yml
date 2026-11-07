@@ -9,7 +9,7 @@ options:
 settings:
   base:
     PRODUCT_NAME: CloseAll
-    MARKETING_VERSION: "1.10.3"
+    MARKETING_VERSION: "1.11.0"
     CURRENT_PROJECT_VERSION: "1"
     SWIFT_VERSION: "5.9"
     MACOSX_DEPLOYMENT_TARGET: "12.0"
@@ -27,9 +27,10 @@ targets:
     sources:
       - path: Sources
         type: group
-    resources:
       - path: Resources
-        type: group
+        excludes:
+          - Info.plist
+        buildPhase: resources
     settings:
       base:
         INFOPLIST_FILE: Resources/Info.plist

@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import Carbon.HIToolbox
 
 class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusBarController: StatusBarController?
@@ -10,13 +11,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             NSApp.setActivationPolicy(.accessory)
         }
 
-        if let bundleURL = Bundle.main.bundleURL as CFURL? {
-            LSRegisterURL(bundleURL, true)
-        }
-
         statusBarController = StatusBarController()
-        registerShortcuts()
+        syncShortcuts()
         UpdateChecker.shared.checkForUpdates()
+
+        if #available(macOS 13.0, *) {
+            UserDefaults.standard.set(LoginItemsManager.isRegistered, forKey: AppConstants.UserDefaultsKeys.launchAtLogin)
+        }
 
         NotificationCenter.default.addObserver(
             self,
@@ -31,57 +32,50 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         statusBarController = nil
     }
 
-    private func registerShortcuts() {
-        let quitAllKey: UInt16 = 0x0A
-        let minimizeAllKey: UInt16 = 0x3E
-        let modifiers: NSEvent.ModifierFlags = [.control, .option, .command]
+    /// Relaunching the app (Spotlight, Finder) opens the popover: the way back in when the icon is hidden.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        statusBarController?.revealPopover()
+        return false
+    }
 
-        shortcutManager.register("quitAll", keyCode: quitAllKey, modifiers: modifiers)
-        shortcutManager.setAction("quitAll") { [weak self] in
-            _ = self?.performQuitAll()
+    private func syncShortcuts() {
+        guard AppSettings.shared.keyboardShortcutsEnabled else {
+            shortcutManager.unregisterAll()
+            return
         }
-
-        shortcutManager.register("minimizeAll", keyCode: minimizeAllKey, modifiers: modifiers)
-        shortcutManager.setAction("minimizeAll") { [weak self] in
+        let mods = UInt32(controlKey | optionKey | cmdKey)
+        shortcutManager.register("quitAll", keyCode: UInt32(kVK_ANSI_Q), carbonModifiers: mods) {
+            QuitAllCoordinator.requestQuitAll()
+        }
+        shortcutManager.register("minimizeAll", keyCode: UInt32(kVK_ANSI_M), carbonModifiers: mods) {
             ProcessManager.shared.minimizeAllApps()
-        }
-
-        if !AppSettings.shared.keyboardShortcutsEnabled {
-            shortcutManager.disableAll()
-        }
-    }
-
-    private func performQuitAll() {
-        let settings = AppSettings.shared
-        if settings.requireQuitConfirmation {
-            showQuitAllConfirmation()
-        } else {
-            ProcessManager.shared.quitAllApps()
-        }
-    }
-
-    private func showQuitAllConfirmation() {
-        let alert = NSAlert()
-        alert.messageText = AppConstants.Localizable.quitAll
-        alert.informativeText = String(format: AppConstants.AlertMessages.quitAllMessage, ProcessManager.shared.runningApps.count)
-        alert.addButton(withTitle: AppConstants.Localizable.quitAll)
-        alert.addButton(withTitle: "Cancel")
-        alert.alertStyle = .warning
-
-        let response = alert.runModal()
-        if response == .alertFirstButtonReturn {
-            ProcessManager.shared.quitAllApps()
         }
     }
 
     @objc private func handleSettingsChanged() {
-        let enabled = AppSettings.shared.keyboardShortcutsEnabled
-        if enabled {
-            registerShortcuts()
-        } else {
-            shortcutManager.disableAll()
-        }
-
+        syncShortcuts()
         statusBarController?.updateVisibility()
+    }
+}
+
+/// Single entry point for "Quit All" (button, menu, hotkey): honours the confirmation setting.
+enum QuitAllCoordinator {
+    static func requestQuitAll() {
+        let pm = ProcessManager.shared
+        guard !pm.runningApps.isEmpty else { return }
+        guard AppSettings.shared.requireQuitConfirmation else {
+            pm.quitAllApps()
+            return
+        }
+        NSApp.activate(ignoringOtherApps: true)
+        let alert = NSAlert()
+        alert.messageText = L.quitAll
+        alert.informativeText = String(format: L.quitAllMessage, pm.runningApps.count)
+        alert.addButton(withTitle: L.quitAll)
+        alert.addButton(withTitle: L.cancel)
+        alert.alertStyle = .warning
+        if alert.runModal() == .alertFirstButtonReturn {
+            pm.quitAllApps()
+        }
     }
 }

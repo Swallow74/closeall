@@ -2,7 +2,7 @@
 
 CloseAll is a lightweight macOS menu bar app that lets you quit all running applications with a single click, with real-time system monitoring (memory, CPU, GPU, disk, thermal).
 
-![CloseAll Screenshot](screenshot-v2.png)
+![CloseAll Screenshot](screenshot-v3.png)
 
 ## Project Structure
 
@@ -20,15 +20,20 @@ closeall/
 │   ├── GPUManager.swift            # GPU utilization monitoring (IOKit)
 │   ├── GPUIconHelper.swift         # Custom drawn GPU status bar icon
 │   ├── ProcessManager.swift        # Logic: app list, quit, force quit, ignore
-│   ├── KeyboardShortcutManager.swift # Global hotkeys via NSEvent
+│   ├── KeyboardShortcutManager.swift # Global hotkeys via Carbon RegisterEventHotKey
+│   ├── ProcessScanner.swift        # libproc scan: memory, CPU time, parent PID
+│   ├── LoginItemsManager.swift     # Launch at login (SMAppService)
 │   ├── Models/
 │   │   └── AppInfo.swift           # Model for listed apps
 │   └── Views/
 │       ├── StatusBarController.swift   # NSStatusItem + NSPopover
 │       ├── PopoverContentView.swift    # Main SwiftUI view
-│       └── AppRowView.swift            # Single app row
+│       ├── SettingsView.swift          # Settings page
+│       ├── Components.swift            # Chips, badges, tooltips, confirm dialogs
+│       └── AppRowView.swift            # App and process rows
 ├── Resources/
-│   └── Info.plist                  # LSUIElement=YES (hides from Dock)
+│   ├── Info.plist                  # LSUIElement=YES (hides from Dock)
+│   └── it.lproj/                   # Italian localization (English is the source)
 ├── project.yml                     # XcodeGen config
 └── SPEC.md                         # Technical specification
 ```
@@ -66,13 +71,18 @@ The built app will be automatically copied to `/Applications/CloseAll.app`.
 | **System Tray Icon** | Changes icon/color based on most critical system condition, tooltip shows all states |
 | **No Dock Icon** | Runs silently in the menu bar |
 | **Update Notifications** | Checks GitHub for new releases and shows download banner |
+| **Non-blocking quit** | Quits run in parallel without freezing the UI; apps that refuse are listed with a one-click Force Quit |
+| **Row context menu** | Right-click an app: show, hide, reveal in Finder, protect, ignore, quit, force quit |
+| **Localized** | English and Italian, follows the system language |
 | **Zero Dependencies** | Pure Swift, no external libraries |
 
 ## Interactions
 
 - **Left-click icon**: opens the app popover
 - **Right-click icon**: quick actions (Minimize All, Quit All, Settings)
-- **Click checkbox** next to an app: select for batch actions
+- **Click an app row**: select it for batch actions
+- **Right-click an app row**: context menu (show, hide, reveal, protect, ignore, quit)
+- **Reopen CloseAll** from Spotlight/Finder: opens the popover, even with the menu icon hidden
 - **Hover on an app row**: shows quit and ignore buttons, plus CPU usage if > 5%
 - **Hover on a process row**: shows terminate and force kill buttons with tooltips
 - **Per-app memory**: resident memory shown as `X MB` or `X.X GB` next to each app, apps sorted by memory usage descending
@@ -92,7 +102,8 @@ The built app will be automatically copied to `/Applications/CloseAll.app`.
 - **Disk space monitoring**: enable/disable disk space monitor (off by default)
 - **CPU monitoring**: enable/disable CPU monitor (off by default)
 - **Auto-free memory**: auto-quit background apps when memory is low (off by default)
-- **Launch at login**: auto-start with your Mac
+- **Memory / disk thresholds**: choose when the warnings trigger
+- **Launch at login**: auto-start with your Mac (macOS 13+: registered via SMAppService)
 
 ## Monitoring Levels
 

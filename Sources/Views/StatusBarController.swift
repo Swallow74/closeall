@@ -239,6 +239,9 @@ final class StatusBarController: NSObject {
         contextMenu.addItem(quitAllItem)
         contextMenu.addItem(.separator())
         contextMenu.addItem(settingsItem)
+        let quitSelf = NSMenuItem(title: AppConstants.Localizable.quitCloseAll, action: #selector(quitAppAction), keyEquivalent: "")
+        quitSelf.target = self
+        contextMenu.addItem(quitSelf)
 
         minimizeItem.target = self
         quitAllItem.target = self
@@ -247,6 +250,7 @@ final class StatusBarController: NSObject {
 
     private func setupPopover() {
         popover.contentSize = NSSize(width: AppConstants.popoverWidth, height: AppConstants.popoverHeight)
+        popover.animates = true
         popover.behavior = .transient
         popover.contentViewController = NSHostingController(
             rootView: PopoverContentView(processManager: processManager, onDismiss: { [weak self] in self?.closePopover() })
@@ -255,6 +259,8 @@ final class StatusBarController: NSObject {
 
     @objc private func popoverDidClose() {
         statusItem.menu = clickMenu
+        MemoryPressureManager.shared.setDetailedScan(false)
+        applyIconVisibility()
     }
 
     @objc private func handleRightClick() {
@@ -268,22 +274,31 @@ final class StatusBarController: NSObject {
     }
 
     @objc private func quitAllAction() {
-        if AppSettings.shared.requireQuitConfirmation {
-            showQuitAllAlert()
-        } else {
-            DispatchQueue.main.async { self.processManager.quitAllApps() }
-        }
+        DispatchQueue.main.async { QuitAllCoordinator.requestQuitAll() }
+    }
+
+    @objc private func quitAppAction() {
+        NSApplication.shared.terminate(nil)
     }
 
     @objc private func openSettingsAction() {
+        showPopover(settings: true)
+    }
+
+    /// Opens the popover even if the menu bar icon is hidden.
+    func revealPopover() {
         showPopover()
     }
 
-    private func showPopover() {
+    private func showPopover(settings: Bool = false) {
         guard let btn = button else { return }
         if popover.isShown { return }
+        if btn.isHidden { btn.isHidden = false }
         statusItem.menu = nil
+        MemoryPressureManager.shared.setDetailedScan(true)
+        NotificationCenter.default.post(name: .popoverWillShow, object: nil, userInfo: ["settings": settings])
         popover.show(relativeTo: btn.bounds, of: btn, preferredEdge: .minY)
+        popover.contentViewController?.view.window?.makeKey()
         UpdateChecker.shared.checkForUpdates()
 
         if let mainScreen = NSScreen.main,
@@ -305,31 +320,17 @@ final class StatusBarController: NSObject {
         statusItem.menu = clickMenu
     }
 
-    private func showQuitAllAlert() {
-        let alert = NSAlert()
-        alert.messageText = AppConstants.Localizable.quitAll
-        alert.informativeText = String(format: AppConstants.AlertMessages.quitAllMessage, processManager.runningApps.count)
-        alert.addButton(withTitle: AppConstants.Localizable.quitAll)
-        alert.addButton(withTitle: "Cancel")
-        alert.alertStyle = .warning
-        let response = alert.runModal()
-        if response == .alertFirstButtonReturn {
-            DispatchQueue.main.async { self.processManager.quitAllApps() }
-        }
-    }
-
     func updateVisibility() {
         applyIconVisibility()
     }
 
     private func applyIconVisibility() {
-        button?.isHidden = AppSettings.shared.hideMenuBarIcon
+        button?.isHidden = AppSettings.shared.hideMenuBarIcon && !popover.isShown
     }
 
     @objc private func handleSettingsChanged() {
         applyIconVisibility()
         updateButtonImage()
-        closePopover()
     }
 }
 
