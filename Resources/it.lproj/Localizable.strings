@@ -51,7 +51,7 @@
 "Remove protection" = "Rimuovi protezione";
 "General" = "Generali";
 "Monitors" = "Monitor";
-"Auto-Free" = "Liberazione automatica";
+"Auto-Free" = "Gestione memoria";
 "Cancel" = "Annulla";
 "Back" = "Indietro";
 "Quit all %d running apps?" = "Chiudere tutte le %d app aperte?";
