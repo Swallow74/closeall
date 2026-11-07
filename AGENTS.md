@@ -38,25 +38,14 @@
 - Status bar button right-click shows: Minimize All / Quit All / Settings (opens popover)
 
 ## Release
-1. Bump `MARKETING_VERSION` in `project.yml`
-2. Build: `xcodebuild -project CloseAll.xcodeproj -scheme CloseAll -destination 'platform=macOS,arch=arm64' build`
-3. Create DMG:
+1. Bump `MARKETING_VERSION` in `project.yml`, commit and push
+2. `./Tools/release.sh` — builds Release, signs with Developer ID, notarizes (keychain profile `winexp-notary`), staples, writes `build/CloseAll.zip` + `build/CloseAll.dmg`
+3. Tag and publish (the `gh` CLI is already authenticated; do not read token files):
    ```bash
-   APP=~/Library/Developer/Xcode/DerivedData/CloseAll-*/Build/Products/Debug/CloseAll.app
-   TMP=$(mktemp -d)/CloseAll
-   mkdir -p "$TMP"
-   cp -R $APP "$TMP/"
-   ln -s /Applications "$TMP/Applications"
-   hdiutil create -volname "CloseAll" -srcfolder "$TMP" -ov -format UDZO /tmp/CloseAll.dmg
+   git tag v<version> && git push origin v<version>
+   gh release create v<version> --title "v<version>: ..." --notes "..." build/CloseAll.dmg build/CloseAll.zip
    ```
-4. Tag and push: `git tag v<version> && git push origin v<version>`
-5. Create release with DMG:
-   ```bash
-   export GH_TOKEN=$(cat ~/.config/opencode/.github-token)
-   gh release create v<version> --title "v<version>: ..." --notes "..."
-   gh release upload v<version> /tmp/CloseAll.dmg --clobber
-   ```
-6. Always include the DMG in the release assets (not just source zip)
+4. Always upload both assets: the zip is what the in-app updater downloads, the DMG is for manual installs
 
 ## Screenshot (README)
 - File: `screenshot-v3.png` (riferito in README.md come `![CloseAll Screenshot](screenshot-v3.png)`)
