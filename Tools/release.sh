@@ -1,14 +1,27 @@
 #!/bin/bash
-# Builds, signs (Developer ID), notarizes and staples CloseAll, then writes build/CloseAll.zip and build/CloseAll.dmg.
+# One command release: build, sign (Developer ID), notarize, staple, zip + dmg, git tag and GitHub release.
+#
+# Usage:  ./Tools/release.sh ["release title"]     (bump MARKETING_VERSION in project.yml first)
+#   - version comes from project.yml; stops if tag v<version> already exists
+#   - release notes = commit subjects since the previous tag
+#   - DRY=1 ./Tools/release.sh   builds, signs and notarizes but does not tag or publish
 #
 # One-time setup: store notarization credentials in the keychain
 #   xcrun notarytool store-credentials winexp-notary --apple-id <id> --team-id <TEAMID>
 # (the profile already exists on this Mac; override with NOTARY_PROFILE=<name>)
 #
-# Then:  ./Tools/release.sh        (bump MARKETING_VERSION in project.yml first)
-# Publish afterwards (see AGENTS.md): git tag, gh release create, upload build/CloseAll.dmg and build/CloseAll.zip
 set -e
 cd "$(dirname "$0")/.."
+
+VERSION=$(sed -n 's/.*MARKETING_VERSION: "\(.*\)"/\1/p' project.yml | head -1)
+TAG="v$VERSION"
+TITLE="${1:-$TAG}"
+[ -n "$VERSION" ] || { echo "MARKETING_VERSION not found in project.yml"; exit 1; }
+if [ -z "$DRY" ]; then
+    git rev-parse -q --verify "refs/tags/$TAG" >/dev/null && { echo "Tag $TAG already exists: bump MARKETING_VERSION."; exit 1; }
+    [ -z "$(git status --porcelain --untracked-files=no)" ] || { echo "Uncommitted changes: commit them first."; exit 1; }
+    git push -q   # the tag must point at a pushed commit
+fi
 
 PROFILE="${NOTARY_PROFILE:-winexp-notary}"
 OUT="build/release"
@@ -25,7 +38,7 @@ xcodegen generate --spec project.yml >/dev/null
 xcodebuild -project CloseAll.xcodeproj -scheme CloseAll -configuration Release \
     -destination 'platform=macOS,arch=arm64' -derivedDataPath build/dd clean build >/dev/null
 cp -R build/dd/Build/Products/Release/CloseAll.app "$APP"
-VERSION=$(defaults read "$PWD/$APP/Contents/Info.plist" CFBundleShortVersionString)
+[ "$(defaults read "$PWD/$APP/Contents/Info.plist" CFBundleShortVersionString)" = "$VERSION" ] || { echo "Built version differs from project.yml"; exit 1; }
 echo "==> Version $VERSION"
 
 # No nested code (single binary, no frameworks): --deep not needed.
@@ -51,3 +64,13 @@ hdiutil create -volname CloseAll -srcfolder "$OUT/dmg" -ov -format UDZO build/Cl
 codesign --sign "$IDENTITY" --timestamp build/CloseAll.dmg
 
 echo "==> Ready: build/CloseAll.zip build/CloseAll.dmg (v$VERSION)"
+
+[ -z "$DRY" ] || { echo "DRY run: not tagged, not published."; exit 0; }
+
+echo "==> Publishing $TAG"
+PREV=$(git describe --tags --abbrev=0 2>/dev/null || true)
+NOTES=$(git log ${PREV:+$PREV..}HEAD --no-merges --pretty='- %s' | grep -v '^- Tools/release' || true)
+git tag "$TAG"
+git push -q origin "$TAG"
+gh release create "$TAG" --title "$TITLE" --notes "${NOTES:-Release $VERSION}
+- Developer ID signed and notarized" build/CloseAll.dmg build/CloseAll.zip

@@ -38,14 +38,9 @@
 - Status bar button right-click shows: Minimize All / Quit All / Settings (opens popover)
 
 ## Release
-1. Bump `MARKETING_VERSION` in `project.yml`, commit and push
-2. `./Tools/release.sh` — builds Release, signs with Developer ID, notarizes (keychain profile `winexp-notary`), staples, writes `build/CloseAll.zip` + `build/CloseAll.dmg`
-3. Tag and publish (the `gh` CLI is already authenticated; do not read token files):
-   ```bash
-   git tag v<version> && git push origin v<version>
-   gh release create v<version> --title "v<version>: ..." --notes "..." build/CloseAll.dmg build/CloseAll.zip
-   ```
-4. Always upload both assets: the zip is what the in-app updater downloads, the DMG is for manual installs
+1. Bump `MARKETING_VERSION` in `project.yml`, commit (the script pushes)
+2. `./Tools/release.sh "v<version>: short title"` — fully automatic: build Release, Developer ID signature, notarization (keychain profile `winexp-notary`), staple, `CloseAll.zip` + `CloseAll.dmg`, git tag, `gh release create` with both assets (notes = commit subjects since the previous tag). `DRY=1` stops before tag/publish.
+3. The `gh` CLI is already authenticated: do not read token files. The zip is what the in-app updater downloads, the DMG is for manual installs.
 
 ## Screenshot (README)
 - File: `screenshot-v3.png` (riferito in README.md come `![CloseAll Screenshot](screenshot-v3.png)`)
