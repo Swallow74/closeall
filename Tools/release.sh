@@ -23,12 +23,7 @@ if [ -z "$DRY" ]; then
     git push -q   # the tag must point at a pushed commit
 fi
 
-# Shared by all apps of this developer: prefer "dev-notary", fall back to the legacy "winexp-notary".
-if [ -z "$NOTARY_PROFILE" ]; then
-    if xcrun notarytool history --keychain-profile dev-notary >/dev/null 2>&1; then NOTARY_PROFILE=dev-notary
-    else NOTARY_PROFILE=winexp-notary; fi
-fi
-PROFILE="$NOTARY_PROFILE"
+PROFILE="${NOTARY_PROFILE:-dev-notary}"  # shared by all apps of this developer
 OUT="build/release"
 APP="$OUT/CloseAll.app"
 

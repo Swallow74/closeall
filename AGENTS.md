@@ -41,7 +41,7 @@
 **Regola: a ogni sessione che modifica il codice dell'app, pubblica sempre una nuova release** (bump versione + `Tools/release.sh`): è l'unico modo in cui le app degli utenti si aggiornano (updater in-app legge la release GitHub). Commit sul repo non basta.
 
 1. Bump `MARKETING_VERSION` in `project.yml`, commit (the script pushes)
-2. `./Tools/release.sh "v<version>: short title"` — fully automatic: build Release, Developer ID signature, notarization (keychain profile `winexp-notary`), staple, `CloseAll.zip` + `CloseAll.dmg`, git tag, `gh release create` with both assets (notes = commit subjects since the previous tag). `DRY=1` stops before tag/publish.
+2. `./Tools/release.sh "v<version>: short title"` — fully automatic: build Release, Developer ID signature, notarization (keychain profile `dev-notary`, shared by all apps), staple, `CloseAll.zip` + `CloseAll.dmg`, git tag, `gh release create` with both assets (notes = commit subjects since the previous tag). `DRY=1` stops before tag/publish.
 3. The `gh` CLI is already authenticated: do not read token files. The zip is what the in-app updater downloads, the DMG is for manual installs.
 
 ## Screenshot (README)
