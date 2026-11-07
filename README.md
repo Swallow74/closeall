@@ -4,6 +4,12 @@ CloseAll is a lightweight macOS menu bar app that lets you quit all running appl
 
 ![CloseAll Screenshot](screenshot-v3.png)
 
+## Install
+
+1. Download `CloseAll.dmg` from the [latest release](https://github.com/Swallow74/closeall/releases/latest) and drag **CloseAll** to Applications.
+2. Requires macOS 12+ on Apple Silicon. English and Italian, following the system language.
+3. Updates: a banner in the popover offers **Install & Restart** when a new release is out (Settings → About → Check for updates).
+
 ## Project Structure
 
 ```
@@ -106,6 +112,8 @@ The built app will be automatically copied to `/Applications/CloseAll.app`.
 - **Launch at login**: auto-start with your Mac (macOS 13+: registered via SMAppService)
 
 ## Monitoring Levels
+
+Thresholds: the memory warning level (10–30%) and the disk warning level (5–100 GB) are configurable in Settings → Monitors. Values below are the defaults.
 
 ### Memory Pressure
 | Level | Free Memory | Indicator |
