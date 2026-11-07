@@ -285,11 +285,14 @@ struct PopoverContentView: View {
                 .font(.system(size: 11, weight: .medium))
                 .foregroundColor(.blue)
             Spacer()
-            Button("Download") {
-                if let url = URL(string: updateChecker.downloadURL) {
+            Button(updateChecker.installing ? "Installing…" : (updateChecker.canInstall ? "Install & Restart" : "Download")) {
+                if updateChecker.canInstall {
+                    updateChecker.install()
+                } else if let url = URL(string: updateChecker.downloadURL) {
                     NSWorkspace.shared.open(url)
                 }
             }
+            .disabled(updateChecker.installing)
             .buttonStyle(.plain)
             .font(.system(size: 10, weight: .semibold))
             .foregroundColor(.white)

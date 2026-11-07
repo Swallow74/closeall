@@ -7,7 +7,81 @@ final class UpdateChecker: ObservableObject {
     @Published var latestVersion = ""
     @Published var downloadURL = ""
     @Published var checking = false
+    @Published var installing = false
     @Published var error: String?
+    private var zipURL: URL?
+
+    /// In-app install possible: release has a .zip and the running copy's folder is writable.
+    var canInstall: Bool {
+        let bundle = Bundle.main.bundleURL
+        return zipURL != nil && bundle.pathExtension == "app"
+            && FileManager.default.isWritableFile(atPath: bundle.deletingLastPathComponent().path)
+    }
+
+    /// Downloads the zip, checks it is this same app and newer, swaps the bundle after quitting, relaunches.
+    func install() {
+        guard let zip = zipURL, !installing else { return }
+        installing = true
+        func fail(_ why: String) {
+            DispatchQueue.main.async {
+                self.installing = false
+                self.error = why
+                if let u = URL(string: self.downloadURL) { NSWorkspace.shared.open(u) }
+            }
+        }
+        URLSession.shared.downloadTask(with: zip) { [currentVersion, isNewer] tmp, resp, _ in
+            guard let tmp, (resp as? HTTPURLResponse)?.statusCode == 200 else { return fail("Download failed.") }
+            let fm = FileManager.default
+            let work = fm.temporaryDirectory.appendingPathComponent("CloseAllUpdate-\(UUID().uuidString)")
+            let archive = work.appendingPathComponent("update.zip")
+            let out = work.appendingPathComponent("x")
+            do {
+                try fm.createDirectory(at: out, withIntermediateDirectories: true)
+                try fm.moveItem(at: tmp, to: archive)
+            } catch { return fail("Couldn't prepare the update.") }
+            guard Self.run("/usr/bin/ditto", ["-x", "-k", archive.path, out.path]) == 0,
+                  let app = (try? fm.contentsOfDirectory(at: out, includingPropertiesForKeys: nil))?
+                      .first(where: { $0.pathExtension == "app" }),
+                  let info = NSDictionary(contentsOf: app.appendingPathComponent("Contents/Info.plist")),
+                  info["CFBundleIdentifier"] as? String == Bundle.main.bundleIdentifier,
+                  let ver = info["CFBundleShortVersionString"] as? String, isNewer(ver, currentVersion),
+                  Self.run("/usr/bin/codesign", ["--verify", "--deep", "--strict", app.path]) == 0
+            else { return fail("The downloaded update didn't pass verification.") }
+
+            // Helper outlives us: waits for exit, swaps the bundle (restores old on failure), strips quarantine, reopens.
+            let script = work.appendingPathComponent("swap.sh")
+            let body = """
+            #!/bin/bash
+            while kill -0 "$1" 2>/dev/null; do sleep 0.2; done
+            BK="$4"
+            if mv "$2" "$BK"; then
+                if ditto "$3" "$2" && xattr -dr com.apple.quarantine "$2"; then rm -rf "$BK"
+                else rm -rf "$2"; mv "$BK" "$2"; fi
+            fi
+            open "$2"
+            rm -rf "$5"
+            """
+            do { try body.write(to: script, atomically: true, encoding: .utf8) } catch { return fail("Couldn't prepare the update.") }
+            let p = Process()
+            p.executableURL = URL(fileURLWithPath: "/bin/bash")
+            p.arguments = [script.path, String(getpid()), Bundle.main.bundlePath, app.path,
+                           work.appendingPathComponent("old.app").path, work.path]
+            p.standardOutput = FileHandle.nullDevice
+            p.standardError = FileHandle.nullDevice
+            do { try p.run() } catch { return fail("Couldn't start the installer.") }
+            DispatchQueue.main.async { NSApp.terminate(nil) }
+        }.resume()
+    }
+
+    private static func run(_ tool: String, _ args: [String]) -> Int32 {
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: tool)
+        p.arguments = args
+        p.standardOutput = FileHandle.nullDevice
+        p.standardError = FileHandle.nullDevice
+        do { try p.run(); p.waitUntilExit() } catch { return -1 }
+        return p.terminationStatus
+    }
 
     private let repo = "Swallow74/closeall"
     private let userDefaultsKey = "CloseAllLastUpdateCheck"
@@ -64,6 +138,9 @@ final class UpdateChecker: ObservableObject {
 
                 self.latestVersion = cleanTag
                 self.downloadURL = htmlURL
+                let assets = json["assets"] as? [[String: Any]] ?? []
+                self.zipURL = assets.first { ($0["name"] as? String)?.hasSuffix(".zip") == true }
+                    .flatMap { ($0["browser_download_url"] as? String).flatMap(URL.init(string:)) }
                 self.updateAvailable = true
             }
         }.resume()
