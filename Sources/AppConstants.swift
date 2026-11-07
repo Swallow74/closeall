@@ -138,6 +138,9 @@ enum AppConstants {
         static let autoFreeHint           = loc("Quits background apps on low memory (not protected ones)")
         static let about                  = loc("About")
         static let checkForUpdates        = loc("Check for updates")
+        static let checking               = loc("Checking…")
+        static let upToDate               = loc("You're up to date")
+        static let updateCheckFailed      = loc("Couldn't check for updates")
     }
 
     static let memoryPressureCheckInterval: TimeInterval = 5.0

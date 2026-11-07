@@ -9,6 +9,7 @@ final class UpdateChecker: ObservableObject {
     @Published var checking = false
     @Published var installing = false
     @Published var error: String?
+    @Published var upToDate = false
     private var zipURL: URL?
 
     /// In-app install possible: release has a .zip and the running copy's folder is writable.
@@ -92,15 +93,18 @@ final class UpdateChecker: ObservableObject {
         currentVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.0.0"
     }
 
-    func checkForUpdates() {
+    /// `manual`: user-initiated, skips the 24h throttle and reports every outcome.
+    func checkForUpdates(manual: Bool = false) {
+        guard !checking else { return }
         let now = Date().timeIntervalSince1970
         let lastCheck = UserDefaults.standard.double(forKey: userDefaultsKey)
-        if now - lastCheck < 86400 {
+        if !manual && now - lastCheck < 86400 {
             return
         }
 
         checking = true
         error = nil
+        upToDate = false
 
         guard let url = URL(string: "https://api.github.com/repos/\(repo)/releases/latest") else {
             checking = false
@@ -111,7 +115,7 @@ final class UpdateChecker: ObservableObject {
         request.setValue("application/vnd.github.v3+json", forHTTPHeaderField: "Accept")
         request.timeoutInterval = 10
 
-        URLSession.shared.dataTask(with: request) { [weak self] data, _, err in
+        URLSession.shared.dataTask(with: request) { [weak self] data, resp, err in
             DispatchQueue.main.async {
                 guard let self else { return }
                 self.checking = false
@@ -121,11 +125,13 @@ final class UpdateChecker: ObservableObject {
                     return
                 }
 
-                guard let data,
+                guard (resp as? HTTPURLResponse)?.statusCode == 200,
+                      let data,
                       let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                       let tag = json["tag_name"] as? String,
                       let htmlURL = json["html_url"] as? String
                 else {
+                    self.error = L.updateCheckFailed
                     return
                 }
 
@@ -133,6 +139,7 @@ final class UpdateChecker: ObservableObject {
 
                 let cleanTag = tag.hasPrefix("v") ? String(tag.dropFirst()) : tag
                 guard self.isNewer(cleanTag, than: self.currentVersion) else {
+                    self.upToDate = true
                     return
                 }
 

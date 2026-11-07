@@ -96,17 +96,36 @@ struct SettingsView: View {
                         HStack {
                             Text("CloseAll \(version)")
                             Spacer()
-                            if updateChecker.checking {
-                                ProgressView().controlSize(.small)
-                            } else if updateChecker.updateAvailable {
-                                Text(String(format: L.updateAvailable, updateChecker.latestVersion)).foregroundColor(.accentColor)
-                            } else {
-                                Button(L.checkForUpdates) { updateChecker.checkForUpdates() }
-                                    .controlSize(.small)
-                            }
+                            Button(L.checkForUpdates) { updateChecker.checkForUpdates(manual: true) }
+                                .controlSize(.small)
+                                .disabled(updateChecker.checking)
                         }
-                        if let err = updateChecker.error {
-                            Text(err).font(.system(size: 10)).foregroundColor(.orange)
+                        if updateChecker.checking {
+                            HStack(spacing: 6) {
+                                ProgressView().controlSize(.small)
+                                Text(L.checking).foregroundColor(.secondary)
+                            }
+                        } else if updateChecker.updateAvailable {
+                            HStack {
+                                Text(String(format: L.updateAvailable, updateChecker.latestVersion)).foregroundColor(.accentColor)
+                                Spacer()
+                                Button(updateChecker.installing ? L.installing : (updateChecker.canInstall ? L.installAndRestart : L.download)) {
+                                    if updateChecker.canInstall {
+                                        updateChecker.install()
+                                    } else if let url = URL(string: updateChecker.downloadURL) {
+                                        NSWorkspace.shared.open(url)
+                                    }
+                                }
+                                .controlSize(.small)
+                                .disabled(updateChecker.installing)
+                            }
+                        } else if updateChecker.upToDate {
+                            Label(L.upToDate, systemImage: "checkmark.circle.fill")
+                                .foregroundColor(.green)
+                        } else if let err = updateChecker.error {
+                            Label(err, systemImage: "exclamationmark.triangle.fill")
+                                .font(.system(size: 11))
+                                .foregroundColor(.orange)
                         }
                     }
                 }

@@ -102,3 +102,6 @@
 "Quit %d app(s), freed %.0f MB of memory" = "Chiuse %d app, liberati %.0f MB di memoria";
 "System thermal state is %@" = "Lo stato termico del sistema è %@";
 "Thermal Warning" = "Temperatura elevata";
+"Checking…" = "Controllo…";
+"You're up to date" = "Sei aggiornato";
+"Couldn't check for updates" = "Impossibile cercare aggiornamenti";
