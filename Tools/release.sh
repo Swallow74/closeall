@@ -7,8 +7,8 @@
 #   - DRY=1 ./Tools/release.sh   builds, signs and notarizes but does not tag or publish
 #
 # One-time setup: store notarization credentials in the keychain
-#   xcrun notarytool store-credentials winexp-notary --apple-id <id> --team-id <TEAMID>
-# (the profile already exists on this Mac; override with NOTARY_PROFILE=<name>)
+#   xcrun notarytool store-credentials dev-notary --apple-id <id> --team-id RBU754TFR9
+# (profile is per developer account, not per app; override with NOTARY_PROFILE=<name>)
 #
 set -e
 cd "$(dirname "$0")/.."
@@ -23,7 +23,12 @@ if [ -z "$DRY" ]; then
     git push -q   # the tag must point at a pushed commit
 fi
 
-PROFILE="${NOTARY_PROFILE:-winexp-notary}"
+# Shared by all apps of this developer: prefer "dev-notary", fall back to the legacy "winexp-notary".
+if [ -z "$NOTARY_PROFILE" ]; then
+    if xcrun notarytool history --keychain-profile dev-notary >/dev/null 2>&1; then NOTARY_PROFILE=dev-notary
+    else NOTARY_PROFILE=winexp-notary; fi
+fi
+PROFILE="$NOTARY_PROFILE"
 OUT="build/release"
 APP="$OUT/CloseAll.app"
 
